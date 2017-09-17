@@ -3,6 +3,19 @@ module Data.Gedcom.Structure where
 import Data.Time.Clock
 import qualified Data.Text.All as T
 
+-- The root structure
+
+data Gedcom = Gedcom {
+  gedcomHeader :: Header,
+  gedcomFamily :: [Family],
+  gedcomIndividual :: [Individual],
+  gedcomMultimedia :: [Multimedia],
+  gedcomNote :: [Note],
+  gedcomRepository :: [Repository],
+  gedcomSource :: [Source],
+  gedcomSubmitter :: [Submitter]
+} deriving Show
+
 -- The header
 
 data Header = Header {
@@ -381,8 +394,6 @@ data RomanPlaceName = RomanPlaceName RomanType [T.Text] deriving Show
 data RomanType = Pinyin | Romaji | WadeGiles | RomanType T.Text deriving Show
 data Sex = Male | Female | Undetermined deriving Show
 data SourceDescription = SourceDescription T.Text [T.Text] deriving Show
-data Year = Year Int deriving Show
-
 data UserReference = UserReference T.Text (Maybe T.Text) deriving Show
 
 newtype AFN = AFN T.Text deriving Show
@@ -392,4 +403,5 @@ newtype Longitude = Longitude Double deriving Show
 newtype QualityAssessment = QualityAssessment Int deriving Show
 newtype RFN = RFN T.Text deriving Show
 newtype RIN = RIN T.Text deriving Show
+newtype Year = Year Int deriving Show
 
