@@ -143,18 +143,6 @@ data Source = Source {
   sourceMultimedia :: [Multimedia]
 } deriving Show
 
-data SourceData = SourceData {
-  sourceDataEventsRecorded :: [SourceRecordedEvent],
-  sourceDataAgency :: T.Text,
-  sourceDataNote :: [Note]
-} deriving Show
-
-data SourceRecordedEvent = SourceRecordedEvent {
-  sourceRecordedEventType :: EventType,
-  sourceRecordedDate :: Maybe DatePeriod,
-  sourceRecordedPlace :: Maybe [T.Text]
-} deriving Show
-
 data Submission = Submission {
   submissionSubmitter :: Maybe Submitter,
   submissionFamilyFile :: Maybe T.Text,
@@ -179,6 +167,18 @@ data Submitter = Submitter {
 } deriving Show
 
 -- Substructures
+data SourceData = SourceData {
+  sourceDataEventsRecorded :: [SourceRecordedEvent],
+  sourceDataAgency :: T.Text,
+  sourceDataNote :: [Note]
+} deriving Show
+
+data SourceRecordedEvent = SourceRecordedEvent {
+  sourceRecordedEventType :: EventType,
+  sourceRecordedDate :: Maybe DatePeriod,
+  sourceRecordedPlace :: Maybe [T.Text]
+} deriving Show
+
 data Association = Association {
   associationIndividual :: Individual,
   associationRelation :: T.Text,
