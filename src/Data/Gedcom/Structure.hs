@@ -51,6 +51,7 @@ data HeaderSourceData = HeaderSourceData {
 
 data Family = Family {
   familyRestrictionNotice :: Maybe RestrictionNotice,
+  familyEvent :: [FamilyEvent],
   familyHusband :: Maybe Individual,
   familyWife :: Maybe Individual,
   familyChildren :: [Individual],
@@ -68,8 +69,12 @@ data Individual = Individual {
   individualRestrictionNotice :: Maybe RestrictionNotice,
   individualName :: Maybe PersonalName,
   individualSex :: Maybe Sex,
+  individualEvent :: [IndividualEvent],
   individualAttribute :: [IndividualAttribute],
+  individualChildToFamilyLink :: [ChildToFamilyLink],
+  individualSpouseToFamilyLink :: [SpouseToFamilyLink],
   individualSubmitter :: [Submitter],
+  individualAssociation :: [Association],
   individualAlias :: [Individual],
   individualAncestorInterest :: [Submitter],
   individualDescendantInterest :: [Submitter],
@@ -111,6 +116,7 @@ data Repository = Repository {
 } deriving Show
 
 data Source = Source {
+  sourceData :: Maybe SourceData,
   sourceAuthor :: Maybe T.Text,
   sourceTitle :: Maybe T.Text,
   sourceShortTitle :: Maybe T.Text,
@@ -122,6 +128,18 @@ data Source = Source {
   sourceChangeDate :: Maybe ChangeDate,
   sourceNote :: [Note],
   sourceMultimedia :: [Multimedia]
+} deriving Show
+
+data SourceData = SourceData {
+  sourceDataEventsRecorded :: [SourceRecordedEvent],
+  sourceDataAgency :: T.Text,
+  sourceDataNote :: [Note]
+} deriving Show
+
+data SourceRecordedEvent = SourceRecordedEvent {
+  sourceRecordedEventType :: EventType,
+  sourceRecordedDate :: Maybe DatePeriod,
+  sourceRecordedPlace :: Maybe [T.Text]
 } deriving Show
 
 data Submission = Submission {
@@ -148,6 +166,68 @@ data Submitter = Submitter {
 } deriving Show
 
 -- Substructures
+data Association = Association {
+  associationIndividual :: Individual,
+  associationRelation :: T.Text,
+  associationCitation :: [SourceCitation],
+  associationNote :: [Note]
+} deriving Show
+
+data ChildToFamilyLink = ChildToFamilyLink {
+  childLinkFamily :: Family,
+  childLinkPedigree :: Maybe Pedigree,
+  childLinkStatus :: Maybe ChildLinkStatus,
+  childLinkNote :: [Note]
+} deriving Show
+
+data SpouseToFamilyLink = SpouseToFamilyLink {
+  spouseToFamilyLinkFamily :: Family,
+  spouseToFamilyLinkNote :: [Note]
+} deriving Show
+
+data EventDetail = EventDetail {
+  eventDetailType :: Maybe T.Text,
+  eventDetailDate :: Maybe DateValue,
+  eventDetailPlace :: Maybe Place,
+  eventDetailAddress :: Maybe Address,
+  eventDetailAgency :: Maybe T.Text,
+  eventDetailReligion :: Maybe T.Text,
+  eventDetailCause :: Maybe T.Text,
+  eventDetailRestrictionNotice :: Maybe RestrictionNotice,
+  eventDetailNote :: [Note],
+  eventDetailSourceCitation :: [SourceCitation],
+  eventDetailMultimedia :: [Multimedia]
+} deriving Show
+
+data FamilyEventDetail = FamilyEventDetail {
+  familyEventDetailAgeHusband :: Maybe Word,
+  familyEventDetailAgeWife :: Maybe Word,
+  familyEventDetailDetail :: Maybe EventDetail
+} deriving Show
+
+data FamilyEvent = FamilyEvent {
+  familyEventType :: FamilyEventType,
+  familyEventDetail :: Maybe FamilyEventDetail
+} deriving Show
+
+data IndividualEventDetail = IndividualEventDetail {
+  individualEventDetailDetail :: EventDetail,
+  individualEventDetailAge :: Maybe Word
+} deriving Show
+
+data IndividualEvent = IndividualEvent {
+  individualEventType :: IndividualEventType,
+  individualEventDetail :: Maybe IndividualEventDetail
+} deriving Show
+
+data Place = Place {
+  placeName :: [T.Text],
+  placeForm :: Maybe [T.Text],
+  placePhonetic :: Maybe PhoneticPlaceName,
+  placeRoman :: Maybe RomanPlaceName,
+  placeMap :: Maybe MapCoord,
+  placeNote :: [Note]
+} deriving Show
 
 data PersonalName = PersonalName {
   personalNameName :: T.Text,
@@ -209,7 +289,6 @@ data RepositoryCitation = RepositoryCitation {
   repoCiteCallNumber :: Maybe CallNumber
 } deriving Show
 
-
 data Address = Address {
   addressLines :: T.Text,
   addressCity :: Maybe T.Text,
@@ -247,22 +326,70 @@ data MultimediaType =
   | MT_PHOTO | MT_TOMBSTONE | MT_VIDEO | MT_OTHER T.Text deriving Show
 
 data NameType =
-  AKA | Birth | Immigrant | Maiden | Married | NameType T.Text
+  AKA | BirthName | Immigrant | Maiden | Married | NameType T.Text
   deriving Show
 
+data DateValue = DateV Date
+  | DateApproxV DateApprox
+  | DatePeriodV DatePeriod
+  | DateRangeV DateRange
+  | DatePhrase (Maybe Date) T.Text deriving Show
+
+data DateApprox = DateAbout Date
+  | DateCalculated Date
+  | DateEstimated Date deriving Show
+
+data DateRange = DateBefore Date
+  | DateAfter Date
+  | DateBetween Date Date deriving Show
+
+data FamilyEventType =
+    Annuled | FamCensus | Divorce | DivorceFiled | Engagement
+  | MarriageBann | MarriageContract | Marriage | MarriageLicense
+  | MarriageSettlement | Residence | FamilyEventType T.Text
+  deriving Show
+
+data IndividualEventType =
+    Birth Family | Christening (Maybe Family) | Death | Burial
+  | Cremation | Adoption (Maybe Parent) | Baptism | BarMitzvah
+  | BasMitzvah | Blessing | ChisteningAdult | Confirmation | FirstCommunion
+  | Ordination | Naturalization | Emigration | Immigration | IndvCensus
+  | Probate | Will | Graduation | Retirement | IndividualEventType T.Text
+  deriving Show
+
+data EventType =
+    FamilyEventTypeV FamilyEventType
+  | IndividualEventTypeV IndividualEventType
+  | EventType T.Text
+  deriving Show
+
+data AdoptionDetail = AdoptionDetail Family (Maybe Parent) deriving Show
+data Calendar = Gregorian | Julian | Hebrew | French deriving Show
+data CallNumber = CallNumber T.Text MultimediaType deriving Show
 data ChangeDate = ChangeDate UTCTime (Maybe Note) deriving Show
 data Charset = Charset T.Text (Maybe T.Text) deriving Show
-data RestrictionNotice = Confidential | Locked | Privacy deriving Show
-data Sex = Male | Female | Undetermined deriving Show
-data UserReference = UserReference T.Text (Maybe T.Text) deriving Show
+data ChildLinkStatus = Challenged | Disproved | Proven deriving Show
+data Date = Date Calendar Year (Maybe Word) (Maybe Word) deriving Show
+data DatePeriod = DateFrom Date (Maybe Date) | DateTo Date deriving Show
+data MapCoord = MapCoord Longitude Latitude deriving Show
+data Parent = Husband | Wife | BothParents deriving Show
+data Pedigree = Adopted | ByBirth | Foster | Sealing deriving Show
+data PhoneticPlaceName = PhoneticPlaceName PhoneticType [T.Text] deriving Show
 data PhoneticType = Kana | Hangul | PhoneticType T.Text deriving Show
+data RestrictionNotice = Confidential | Locked | Privacy deriving Show
+data RomanPlaceName = RomanPlaceName RomanType [T.Text] deriving Show
 data RomanType = Pinyin | Romaji | WadeGiles | RomanType T.Text deriving Show
+data Sex = Male | Female | Undetermined deriving Show
 data SourceDescription = SourceDescription T.Text [T.Text] deriving Show
-data CallNumber = CallNumber T.Text MultimediaType deriving Show
+data Year = Year Int deriving Show
 
-newtype RIN = RIN T.Text deriving Show
-newtype RFN = RFN T.Text deriving Show
+data UserReference = UserReference T.Text (Maybe T.Text) deriving Show
+
 newtype AFN = AFN T.Text deriving Show
 newtype Language = Language T.Text deriving Show
+newtype Latitude = Latitude Double deriving Show
+newtype Longitude = Longitude Double deriving Show
 newtype QualityAssessment = QualityAssessment Int deriving Show
+newtype RFN = RFN T.Text deriving Show
+newtype RIN = RIN T.Text deriving Show
 
