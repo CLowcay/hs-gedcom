@@ -1,11 +1,14 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TupleSections #-}
 
 module Data.Gedcom.LineParser where
 
+import Control.Arrow
 import Control.Monad
 import Data.Char
 import Data.Gedcom.Internal.Common
+import Data.List
 import Data.Maybe
 import Data.Monoid
 import qualified Data.Text.All as T
@@ -17,10 +20,44 @@ data GDLine = GDLine GDLevel (Maybe GDXRefID) GDTag (Maybe GDLineValue)
   deriving Show
 data GDLineValue =
   GDLineItemV GDLineItem | GDXRefIDV GDXRefID deriving (Show, Eq)
-newtype GDLineItem = GDLineItem T.Text deriving (Show, Eq, Ord)
+newtype GDLineItem = GDLineItem [(Maybe GDEscape, T.Text)] deriving (Show, Eq)
+newtype GDEscape = GDEscape T.Text deriving (Show, Eq)
 newtype GDXRefID = GDXRefID T.Text deriving (Show, Eq, Ord)
 newtype GDTag = GDTag T.Text deriving (Show, Eq, Ord)
 newtype GDLevel = GDLevel Int deriving (Show, Eq, Ord, Num)
+
+gdLineData :: GDLineItem -> [(Maybe GDEscape, T.Text)]
+gdLineData (GDLineItem v) = v
+
+instance Monoid GDLineItem where
+  mempty = GDLineItem []
+  mappend (GDLineItem l1) (GDLineItem l2) =
+    GDLineItem . fmap coalease . groupBy canCoalease$ l1 <> l2
+    where
+      coalease [] = (Nothing, "") 
+      coalease (l:ls) = foldl' (\(_, t1) (e, t2) -> (e, t1 <> t2)) l ls
+      canCoalease (Nothing, _) (_, _) = True
+      canCoalease _ _ = False
+
+gdTrimLineItem :: GDLineItem -> GDLineItem
+gdTrimLineItem (GDLineItem []) = GDLineItem []
+gdTrimLineItem (GDLineItem ((e, t):rst)) =
+  let
+    rst' = reverse$ case reverse rst of
+      [] -> []
+      ((e', t'):rst'') -> (e', T.dropWhile isSpace t'):rst''
+  in GDLineItem$ (e, T.dropWhile isSpace t):rst'
+
+gdIgnoreEscapes :: [(Maybe GDEscape, T.Text)] -> T.Text
+gdIgnoreEscapes  = T.concat . fmap snd
+
+gdFilterEscapes ::
+  [GDEscape] -> [(Maybe GDEscape, T.Text)] -> [(Maybe GDEscape, T.Text)]
+gdFilterEscapes escapes =
+  gdLineData . mconcat . fmap GDLineItem . fmap (:[]) . fmap (first f)
+  where
+    f (Just e) = if e `elem` escapes then Just e else Nothing
+    f Nothing = Nothing
 
 gdAnyChar :: Parser String
 gdAnyChar = (fmap (:[]) gdNonAt) <|> string "@@"
@@ -42,8 +79,9 @@ gdOtherChar =
 gdDelim :: Parser (Maybe Char)
 gdDelim = optional$ char '\x20'
 
-gdEscape :: Parser String
-gdEscape = string "@#" *> gdEscapeText <* char '@' <* (optional$ char ' ')
+gdEscape :: Parser GDEscape
+gdEscape = GDEscape . T.pack <$>
+  (string "@#" *> gdEscapeText <* char '@' <* (optional$ char ' '))
 
 gdEscapeText :: Parser String
 gdEscapeText = concat <$> many gdAnyChar
@@ -52,8 +90,8 @@ gdLevel :: Parser GDLevel
 gdLevel = GDLevel . read <$> count' 1 2 digitChar
 
 gdLineItem :: Parser GDLineItem
-gdLineItem = fmap (GDLineItem . T.pack . concat) . some$
-  gdEscape <|> (concat <$> some gdAnyChar)
+gdLineItem = fmap GDLineItem . some$
+  (,) <$> optional gdEscape <*> (T.pack . concat <$> some gdAnyChar)
 
 gdPointer :: Parser GDXRefID
 gdPointer = char '@' *> plabel <* char '@'
@@ -114,4 +152,4 @@ gdTree pid n = do
 
 gdRoot :: Parser GDRoot
 gdRoot = GDRoot <$> (many$ gdTree (GDXRefID "") 0)
-  
+

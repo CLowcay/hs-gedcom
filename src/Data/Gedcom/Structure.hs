@@ -136,7 +136,7 @@ data Source = Source {
   sourcePublicationFacts :: Maybe T.Text,
   sourceText :: Maybe T.Text,
   sourceRepositoryCitations :: [RepositoryCitation],
-  sourceUserReference :: Maybe UserReference,
+  sourceUserReference :: [UserReference],
   sourceRIN :: Maybe RIN,
   sourceChangeDate :: Maybe ChangeDate,
   sourceNote :: [Note],
@@ -169,12 +169,12 @@ data Submitter = Submitter {
 -- Substructures
 data SourceData = SourceData {
   sourceDataEventsRecorded :: [SourceRecordedEvent],
-  sourceDataAgency :: T.Text,
+  sourceDataAgency :: Maybe T.Text,
   sourceDataNote :: [Note]
 } deriving Show
 
 data SourceRecordedEvent = SourceRecordedEvent {
-  sourceRecordedEventType :: EventType,
+  sourceRecordedEventType :: [EventType],
   sourceRecordedDate :: Maybe DatePeriod,
   sourceRecordedPlace :: Maybe [T.Text]
 } deriving Show
@@ -363,26 +363,27 @@ data FamilyEventType =
   deriving Show
 
 data IndividualEventType =
-    Birth Family | Christening (Maybe Family) | Death | Burial
+    Birth (Maybe Family) | Christening (Maybe Family) | Death | Burial
   | Cremation | Adoption (Maybe Parent) | Baptism | BarMitzvah
-  | BasMitzvah | Blessing | ChisteningAdult | Confirmation | FirstCommunion
+  | BasMitzvah | Blessing | ChristeningAdult | Confirmation | FirstCommunion
   | Ordination | Naturalization | Emigration | Immigration | IndvCensus
   | Probate | Will | Graduation | Retirement | IndividualEventType T.Text
   deriving Show
 
 data EventType =
-    FamilyEventTypeV FamilyEventType
+    Census
+  | FamilyEventTypeV FamilyEventType
   | IndividualEventTypeV IndividualEventType
   | EventType T.Text
   deriving Show
 
 data AdoptionDetail = AdoptionDetail Family (Maybe Parent) deriving Show
 data Calendar = Gregorian | Julian | Hebrew | French deriving Show
-data CallNumber = CallNumber T.Text MultimediaType deriving Show
+data CallNumber = CallNumber T.Text (Maybe MultimediaType) deriving Show
 data ChangeDate = ChangeDate UTCTime (Maybe Note) deriving Show
 data Charset = Charset T.Text (Maybe T.Text) deriving Show
 data ChildLinkStatus = Challenged | Disproved | Proven deriving Show
-data Date = Date Calendar Year (Maybe Word) (Maybe Word) deriving Show
+data Date = Date Calendar (Maybe Word) (Maybe Word) Year deriving Show
 data DatePeriod = DateFrom Date (Maybe Date) | DateTo Date deriving Show
 data MapCoord = MapCoord Longitude Latitude deriving Show
 data Parent = Husband | Wife | BothParents deriving Show
