@@ -397,7 +397,13 @@ parseSpouseToFamilyLink :: StructureParser SpouseToFamilyLink
 parseSpouseToFamilyLink = undefined
 
 parseAssociation :: StructureParser Association
-parseAssociation = undefined
+parseAssociation = parseTagFull (GDTag "ASSO")$ \(lb, children) ->
+  case lb of
+    Right _ -> throwError.XRefError$ "Missing link in ASSO"
+    Left i -> runMultiMonad children$ i
+      <$> parseRequired (GDTag "RELA") (parseTextTag (GDTag "RELA"))
+      <*> parseMulti parseSourceCitation
+      <*> parseMulti parseNote
 
 parseSourceRecordedEvent :: StructureParser SourceRecordedEvent
 parseSourceRecordedEvent = parseTag (GDTag "EVEN")$ \(recorded, children) ->
