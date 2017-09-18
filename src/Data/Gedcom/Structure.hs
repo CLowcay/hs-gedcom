@@ -68,7 +68,7 @@ data Family = Family {
   familyHusband :: Maybe Individual,
   familyWife :: Maybe Individual,
   familyChildren :: [Individual],
-  familyTotalChildren :: Maybe Int,
+  familyTotalChildren :: Maybe Word,
   familySubitter :: [Submitter],
   familyUserReference :: [UserReference],
   familyRIN :: Maybe RIN,
@@ -147,8 +147,8 @@ data Submission = Submission {
   submissionSubmitter :: Maybe Submitter,
   submissionFamilyFile :: Maybe T.Text,
   submissionTempleCode :: Maybe T.Text,
-  submissionAncestorGenerations :: Maybe Int,
-  submissionDescendentGenerations :: Maybe Int,
+  submissionAncestorGenerations :: Maybe Word,
+  submissionDescendentGenerations :: Maybe Word,
   submissionOrdinanceProcessing :: Maybe Bool,
   submissionRIN :: Maybe RIN,
   submissionNote :: [Note],
@@ -273,14 +273,18 @@ data PersonalNamePieces = PersonalNamePieces {
   namePirceSourceCitation :: [SourceCitation]
 } deriving Show
 
-data IndividualAttribute =
+data IndividualAttribute = IndividualAttribute
+    IndividualAttributeType IndividualEventDetail
+  deriving Show
+
+data IndividualAttributeType =
     Caste T.Text
   | PhysicalDescription T.Text
   | Education T.Text
   | NationalID T.Text
   | NationalOrigin T.Text
-  | NChildren Int
-  | NMarriages T.Text
+  | NChildren Word
+  | NMarriages Word
   | Occupation T.Text
   | Possessions T.Text
   | Religion T.Text
@@ -403,7 +407,7 @@ newtype AFN = AFN T.Text deriving Show
 newtype Language = Language T.Text deriving Show
 newtype Latitude = Latitude Double deriving Show
 newtype Longitude = Longitude Double deriving Show
-newtype QualityAssessment = QualityAssessment Int deriving Show
+newtype QualityAssessment = QualityAssessment Word deriving Show
 newtype RFN = RFN T.Text deriving Show
 newtype RIN = RIN T.Text deriving Show
 newtype Year = Year Int deriving Show

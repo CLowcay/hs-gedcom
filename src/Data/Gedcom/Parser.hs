@@ -112,7 +112,8 @@ parseFamily = parseTag (GDTag "FAM")$ \(_, children) ->
     <*> parseOptional (parseIndividual (GDTag "HUSB"))
     <*> parseOptional (parseIndividual (GDTag "WIFE"))
     <*> parseMulti (parseIndividual (GDTag "CHIL"))
-    <*> parseOptional (parseIntTag (GDTag "NCHI"))
+    <*> parseOptional ((fmap.fmap.fmap) fromIntegral$
+      parseIntTag (GDTag "NCHI"))
     <*> parseMulti (parseSubmitter (GDTag "SUBM"))
     <*> parseMulti parseUserReference
     <*> parseOptional parseRIN
@@ -128,7 +129,7 @@ parseIndividual tag = parseTag tag$ \(_, children) ->
     <*> parseOptional parsePersonalName
     <*> parseOptional parseSex
     <*> parseMulti parseIndividualEvent
-    <*> parseMulti parseIndividualAttribute
+    <*> parseIndividualAttribute
     <*> parseMulti parseChildToFamilyLink
     <*> parseMulti parseSpouseToFamilyLink
     <*> parseMulti (parseSubmitter (GDTag "SUBM"))
@@ -197,8 +198,10 @@ parseSubmission = parseTag (GDTag "SUBN")$ \(_, children) ->
     <$> parseOptional (parseSubmitter (GDTag "SUBM"))
     <*> parseOptional (parseTextTag (GDTag "FAMF"))
     <*> parseOptional (parseTextTag (GDTag "TEMP"))
-    <*> parseOptional (parseIntTag (GDTag "ANCE"))
-    <*> parseOptional (parseIntTag (GDTag "DESC"))
+    <*> parseOptional ((fmap.fmap.fmap) fromIntegral$
+      parseIntTag (GDTag "ANCE"))
+    <*> parseOptional ((fmap.fmap.fmap) fromIntegral$
+      parseIntTag (GDTag "DESC"))
     <*> parseOptional (parseBoolTag (GDTag "ORDI"))
     <*> parseOptional parseRIN
     <*> parseMulti parseNote
@@ -384,11 +387,36 @@ parseSex = parseTag (GDTag "SEX")$ \(t, _) ->
     "U" -> return Undetermined
     _ -> throwError.XRefError$ "Unknown sex code " <> (T.show t)
   
+parseIndividualAttribute :: MultiMonad [IndividualAttribute]
+parseIndividualAttribute = do
+    concat <$> mapM (parseMulti.attributeTag) [
+      (GDTag "CAST", Caste),
+      (GDTag "DSCR", PhysicalDescription),
+      (GDTag "EDUC",  Education),
+      (GDTag "IPNO", NationalID),
+      (GDTag "NATI", NationalOrigin),
+      (GDTag "NCHI", NChildren . read . T.unpack),
+      (GDTag "NMR", NMarriages . read . T.unpack),
+      (GDTag "OCCU", Occupation),
+      (GDTag "PROP", Possessions),
+      (GDTag "RELI", Religion),
+      (GDTag "RESI", const ResidesAt),
+      (GDTag "SSN", SocialSecurity),
+      (GDTag "TITL", Title),
+      (GDTag "FACT", Fact)]
+  where
+    attributeTag (tag, mkType) = parseTag tag$ \(t, children) ->
+      runMultiMonad children$ IndividualAttribute (mkType$ gdIgnoreEscapes t)
+        <$> parseIndividualEventDetail
+
 parseIndividualEvent :: StructureParser IndividualEvent
 parseIndividualEvent = undefined
 
-parseIndividualAttribute :: StructureParser IndividualAttribute
-parseIndividualAttribute = undefined
+parseIndividualEventDetail :: MultiMonad IndividualEventDetail
+parseIndividualEventDetail = IndividualEventDetail
+  <$> parseEventDetail
+  <*> parseOptional ((fmap.fmap.fmap) fromIntegral$
+    parseIntTag (GDTag "AGE"))
 
 parseChildToFamilyLink :: StructureParser ChildToFamilyLink
 parseChildToFamilyLink = parseTagFull (GDTag "FAMC")$ \(lb, children) ->
@@ -795,7 +823,8 @@ parseLanguage :: StructureParser Language
 parseLanguage = (fmap.fmap.fmap) (Language) $ parseTextTag (GDTag "LANG")
 
 parseQuality :: StructureParser QualityAssessment
-parseQuality = (fmap.fmap.fmap) (QualityAssessment) $ parseIntTag (GDTag "QUAY")
+parseQuality = (fmap.fmap.fmap) (QualityAssessment . fromIntegral)$
+  parseIntTag (GDTag "QUAY")
 
 -- General parsers
 
