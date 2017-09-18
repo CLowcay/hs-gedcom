@@ -33,13 +33,13 @@ parseReferredStructure t@(GDTree (GDLine _ _ tag _) _) =
   GDStructure <$> parser t
   where
     parser = case tag of
-      gd@(GDTag "SUBM") -> makeDynamic gd$ parseSubmitter
+      gd@(GDTag "SUBM") -> makeDynamic gd$ parseSubmitter (GDTag "SUBM")
       gd@(GDTag "SUBN") -> makeDynamic gd$ parseSubmission
-      gd@(GDTag "INDI") -> undefined
+      gd@(GDTag "INDI") -> makeDynamic gd$ parseIndividual (GDTag "INDI")
       gd@(GDTag "NOTE") -> makeDynamic gd$ parseNote
       gd@(GDTag "REPO") -> makeDynamic gd$ parseRepository
       gd@(GDTag "SOUR") -> makeDynamic gd$ parseSource
-      gd@(GDTag "FAM" ) -> undefined
+      gd@(GDTag "FAM" ) -> makeDynamic gd$ parseFamily
       gd@(GDTag "OBJE") -> makeDynamic gd$ parseMultimediaRecord
       _ -> \_ -> throwError.XRefError$ "Invalid reference to " <> (T.show tag)
 
@@ -73,7 +73,7 @@ parseHeader = parseTag (GDTag "HEAD")$ \(_, children) ->
     <$> parseRequired (GDTag "SOUR") parseHeaderSource
     <*> parseOptional (parseTextTag (GDTag "DEST"))
     <*> parseOptional parseExactDateTime
-    <*> parseRequired (GDTag "SUBM") parseSubmitter
+    <*> parseRequired (GDTag "SUBM") (parseSubmitter (GDTag "SUBM"))
     <*> parseOptional parseSubmission
     <*> parseOptional parseFile
     <*> parseOptional parseCopyright
@@ -103,6 +103,47 @@ parseHeaderSourceData = parseTag (GDTag "DATA")$ \(name, children) ->
     <*> parseOptional parseCopyright
 
 -- Records
+
+parseFamily :: StructureParser Family
+parseFamily = parseTag (GDTag "FAM")$ \(_, children) ->
+  runMultiMonad children$ Family
+    <$> parseOptional parseRestrictionNotice
+    <*> parseFamilyEvent
+    <*> parseOptional (parseIndividual (GDTag "HUSB"))
+    <*> parseOptional (parseIndividual (GDTag "WIFE"))
+    <*> parseMulti (parseIndividual (GDTag "CHIL"))
+    <*> parseOptional (parseIntTag (GDTag "NCHI"))
+    <*> parseMulti (parseSubmitter (GDTag "SUBM"))
+    <*> parseMulti parseUserReference
+    <*> parseOptional parseRIN
+    <*> parseOptional parseChangeDate
+    <*> parseMulti parseNote
+    <*> parseMulti parseSourceCitation
+    <*> parseMulti parseMultimedia
+
+parseIndividual :: GDTag -> StructureParser Individual
+parseIndividual tag = parseTag tag$ \(_, children) ->
+  runMultiMonad children$ Individual
+    <$> parseOptional parseRestrictionNotice
+    <*> parseOptional parsePersonalName
+    <*> parseOptional parseSex
+    <*> parseMulti parseIndividualEvent
+    <*> parseMulti parseIndividualAttribute
+    <*> parseMulti parseChildToFamilyLink
+    <*> parseMulti parseSpouseToFamilyLink
+    <*> parseMulti (parseSubmitter (GDTag "SUBM"))
+    <*> parseMulti parseAssociation
+    <*> parseMulti (parseIndividual (GDTag "ALIA"))
+    <*> parseMulti (parseSubmitter (GDTag "ANCI"))
+    <*> parseMulti (parseSubmitter (GDTag "DECI"))
+    <*> parseOptional parseRFN
+    <*> parseOptional parseAFN
+    <*> parseMulti parseUserReference
+    <*> parseOptional parseRIN
+    <*> parseOptional parseChangeDate
+    <*> parseMulti parseNote
+    <*> parseMulti parseSourceCitation
+    <*> parseMulti parseMultimedia
 
 parseNote :: StructureParser Note
 parseNote = parseTag (GDTag "NOTE")$ \(t, children) ->
@@ -138,8 +179,8 @@ parseSource = parseTag (GDTag "SOUR")$ \(_, children) ->
     <*> parseMulti parseNote
     <*> parseMulti parseMultimedia
 
-parseSubmitter :: StructureParser Submitter
-parseSubmitter = parseTag (GDTag "SUBM")$ \(_, children) ->
+parseSubmitter :: GDTag -> StructureParser Submitter
+parseSubmitter tag = parseTag tag$ \(_, children) ->
   runMultiMonad children$ Submitter
     <$> parseRequired (GDTag "NAME") parseName
     <*> (parseContactDetails >>= (parseOptional.parseAddress))
@@ -153,7 +194,7 @@ parseSubmitter = parseTag (GDTag "SUBM")$ \(_, children) ->
 parseSubmission :: StructureParser Submission
 parseSubmission = parseTag (GDTag "SUBN")$ \(_, children) ->
   runMultiMonad children$ Submission
-    <$> parseOptional parseSubmitter
+    <$> parseOptional (parseSubmitter (GDTag "SUBM"))
     <*> parseOptional (parseTextTag (GDTag "FAMF"))
     <*> parseOptional (parseTextTag (GDTag "TEMP"))
     <*> parseOptional (parseIntTag (GDTag "ANCE"))
@@ -165,12 +206,152 @@ parseSubmission = parseTag (GDTag "SUBN")$ \(_, children) ->
 
 -- Substructures
 
+parseRestrictionNotice :: StructureParser RestrictionNotice
+parseRestrictionNotice = parseTag (GDTag "RESN")$ \(t, _) ->
+  case parseMaybe parser (gdIgnoreEscapes t) of
+    Nothing -> throwError.XRefError$
+      "Bad restriction notice " <> (T.show t)
+    Just r -> return r
+  where parser :: Parser RestrictionNotice
+        parser =     (Confidential <$ string' "confidential")
+                 <|> (Locked <$ string' "locked")
+                 <|> (Privacy <$ string' "privacy")
+
+parseFamilyEvent :: MultiMonad [FamilyEvent]
+parseFamilyEvent = do
+    concat <$> mapM (parseMulti.familyEventTag) [
+      (GDTag "ANUL", const Annuled),
+      (GDTag "CENS", const FamCensus),
+      (GDTag "DIV",  const Divorce),
+      (GDTag "DIVF", const DivorceFiled),
+      (GDTag "ENGA", const Engagement),
+      (GDTag "MARB", const MarriageBann),
+      (GDTag "MARC", const MarriageContract),
+      (GDTag "MARR", const Marriage),
+      (GDTag "MARL", const MarriageLicense),
+      (GDTag "MARS", const MarriageSettlement),
+      (GDTag "RESI", const Residence),
+      (GDTag "EVEN", FamilyEventType)]
+  where
+    familyEventTag (tag, mkType) = parseTag tag$ \(t, children) ->
+      runMultiMonad children$ FamilyEvent (mkType$ gdIgnoreEscapes t)
+        <$> parseFamilyEventDetail
+
+parseFamilyEventDetail :: MultiMonad FamilyEventDetail
+parseFamilyEventDetail = FamilyEventDetail
+  <$> parseOptional (parseAge (GDTag "HUSB"))
+  <*> parseOptional (parseAge (GDTag "WIFE"))
+  <*> parseEventDetail
+
+parseEventDetail :: MultiMonad EventDetail
+parseEventDetail = EventDetail
+  <$> parseOptional (parseTextTag (GDTag "TYPE"))
+  <*> parseOptional parseDateValue
+  <*> parseOptional parsePlace
+  <*> (parseContactDetails >>= (parseOptional.parseAddress))
+  <*> parseOptional (parseTextTag (GDTag "AGNC"))
+  <*> parseOptional (parseTextTag (GDTag "RELI"))
+  <*> parseOptional (parseTextTag (GDTag "CAUS"))
+  <*> parseOptional parseRestrictionNotice
+  <*> parseMulti parseNote
+  <*> parseMulti parseSourceCitation
+  <*> parseMulti parseMultimedia
+
+parseAge :: GDTag -> StructureParser Word
+parseAge tag = (fmap.fmap.fmap) fromIntegral$
+  parseTag tag$ \(_, children) ->
+    runMultiMonad children$
+      parseRequired (GDTag "AGE") (parseIntTag (GDTag "AGE"))
+
 parseSourceData :: StructureParser SourceData
 parseSourceData = parseTag (GDTag "DATA")$ \(_, children) ->
   runMultiMonad children$ SourceData
     <$> parseMulti parseSourceRecordedEvent
     <*> parseOptional (parseTextTag (GDTag "AGNC"))
     <*> parseMulti parseNote
+
+parsePlace :: StructureParser Place
+parsePlace = parseTag (GDTag "PLAC")$ \(t, children) ->
+  runMultiMonad children$ Place
+    <$> (pure$ T.splitOn "," . gdIgnoreEscapes$ t)
+    <*> parseOptional ((fmap.fmap.fmap) (T.splitOn ",")$
+      parseTextTag (GDTag "FORM"))
+    <*> parseOptional parsePhoneticPlaceName
+    <*> parseOptional parseRomanPlaceName
+    <*> parseOptional parseMapCoord
+    <*> parseMulti parseNote
+
+parsePhoneticPlaceName :: StructureParser PhoneticPlaceName
+parsePhoneticPlaceName = parseTag (GDTag "FONE")$ \(t, children) ->
+  runMultiMonad children$ PhoneticPlaceName
+    <$> parseRequired (GDTag "TYPE")
+      ((fmap.fmap.fmap) getPhoneticType$ parseTextTag (GDTag "TYPE"))
+    <*> (pure . T.splitOn "," . gdIgnoreEscapes$ t)
+
+parseRomanPlaceName :: StructureParser RomanPlaceName
+parseRomanPlaceName = parseTag (GDTag "ROMN")$ \(t, children) ->
+  runMultiMonad children$ RomanPlaceName
+    <$> parseRequired (GDTag "TYPE")
+      ((fmap.fmap.fmap) getRomanType$ parseTextTag (GDTag "TYPE"))
+    <*> (pure . T.splitOn "," . gdIgnoreEscapes$ t)
+
+getPhoneticType :: T.Text -> PhoneticType
+getPhoneticType t = case trim . T.toUpper$ t of
+  "HANGUL" -> Hangul
+  "KANA" -> Kana
+  v -> PhoneticType v
+
+getRomanType :: T.Text -> RomanType
+getRomanType t = case trim . T.toUpper$ t of
+  "PINYIN" -> Pinyin
+  "ROMAJI" -> Romaji
+  "WADEGILES" -> WadeGiles
+  v -> RomanType v
+
+parseMapCoord :: StructureParser MapCoord
+parseMapCoord = parseTag (GDTag "MAP")$ \(_, children) ->
+  runMultiMonad children$ MapCoord
+    <$> parseRequired (GDTag "LATI") ((fmap.fmap.fmap) Longitude$
+      parseLongLat (GDTag "LATI") 'N' 'S')
+    <*> parseRequired (GDTag "LONG") ((fmap.fmap.fmap) Latitude$
+      parseLongLat (GDTag "LONG") 'E' 'W')
+
+parseLongLat :: GDTag -> Char -> Char -> StructureParser Double
+parseLongLat tag p n = parseTag tag$ \(t, _) ->
+  case T.uncons . T.toUpper . gdIgnoreEscapes$ t of
+    Nothing -> throwError.XRefError$
+      "Badly formatted longitude/latitude " <> (T.show t)
+    Just (i, r) ->
+      if i == p then return$ read . T.unpack$ r
+      else if i == n then return$ negate . read . T.unpack$ r
+      else throwError.XRefError$
+        "Badly formatted longitude/latitude" <> (T.show t)
+
+parsePersonalName :: StructureParser PersonalName
+parsePersonalName = undefined
+
+parseSex :: StructureParser Sex
+parseSex = parseTag (GDTag "SEX")$ \(t, _) ->
+  case trim . T.toUpper . gdIgnoreEscapes $ t of
+    "M" -> return Male
+    "F" -> return Female
+    "U" -> return Undetermined
+    _ -> throwError.XRefError$ "Unknown sex code " <> (T.show t)
+  
+parseIndividualEvent :: StructureParser IndividualEvent
+parseIndividualEvent = undefined
+
+parseIndividualAttribute :: StructureParser IndividualAttribute
+parseIndividualAttribute = undefined
+
+parseChildToFamilyLink :: StructureParser ChildToFamilyLink
+parseChildToFamilyLink = undefined
+
+parseSpouseToFamilyLink :: StructureParser SpouseToFamilyLink
+parseSpouseToFamilyLink = undefined
+
+parseAssociation :: StructureParser Association
+parseAssociation = undefined
 
 parseSourceRecordedEvent :: StructureParser SourceRecordedEvent
 parseSourceRecordedEvent = parseTag (GDTag "EVEN")$ \(recorded, children) ->
@@ -258,6 +439,9 @@ parseAddress contacts = parseTag (GDTag "ADDR")$ \(addr, children) ->
     <*> pure contacts
 
 -- Values
+
+parseDateValue :: StructureParser DateValue
+parseDateValue = undefined
 
 decodeCalendarEscape :: Maybe GDEscape -> Calendar
 decodeCalendarEscape Nothing = Gregorian
@@ -519,6 +703,9 @@ parseCopyright = parseTextTag (GDTag "COPR")
 
 parseFile :: StructureParser FilePath
 parseFile = (fmap.fmap.fmap) T.unpack$ parseTextTag (GDTag "FILE")
+
+parseAFN :: StructureParser AFN
+parseAFN = (fmap.fmap.fmap) AFN$ parseTextTag (GDTag "AFN")
 
 parseRFN :: StructureParser RFN
 parseRFN = (fmap.fmap.fmap) RFN$ parseTextTag (GDTag "RFN")

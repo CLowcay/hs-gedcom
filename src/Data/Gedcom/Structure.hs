@@ -215,12 +215,12 @@ data EventDetail = EventDetail {
 data FamilyEventDetail = FamilyEventDetail {
   familyEventDetailAgeHusband :: Maybe Word,
   familyEventDetailAgeWife :: Maybe Word,
-  familyEventDetailDetail :: Maybe EventDetail
+  familyEventDetailDetail :: EventDetail
 } deriving Show
 
 data FamilyEvent = FamilyEvent {
   familyEventType :: FamilyEventType,
-  familyEventDetail :: Maybe FamilyEventDetail
+  familyEventDetail :: FamilyEventDetail
 } deriving Show
 
 data IndividualEventDetail = IndividualEventDetail {
