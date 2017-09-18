@@ -243,21 +243,21 @@ data Place = Place {
 } deriving Show
 
 data PersonalName = PersonalName {
-  personalNameName :: T.Text,
-  personalNameType :: NameType,
+  personalNameName :: Name,
+  personalNameType :: Maybe NameType,
   personalNamePieces :: PersonalNamePieces,
   personalNamePhonetic :: [PhoneticName],
   personalNameRoman :: [RomanizedName]
 } deriving Show
 
 data PhoneticName = PhoneticName {
-  phoneticName :: T.Text,
+  phoneticName :: Name,
   phoneticType :: PhoneticType,
   phoneticPieces :: PersonalNamePieces
 } deriving Show
 
 data RomanizedName = RomanizedName {
-  romanziedName :: T.Text,
+  romanziedName :: Name,
   romanziedType :: RomanType,
   romanziedPieces :: PersonalNamePieces
 } deriving Show
@@ -269,7 +269,8 @@ data PersonalNamePieces = PersonalNamePieces {
   namePieceSurnamePrefix :: [T.Text],
   namePieceSurname :: [T.Text],
   namePieceSuffix :: [T.Text],
-  namePieceNameNote :: Maybe Note
+  namePieceNameNote :: [Note],
+  namePirceSourceCitation :: [SourceCitation]
 } deriving Show
 
 data IndividualAttribute =
@@ -386,6 +387,7 @@ data ChildLinkStatus = Challenged | Disproved | Proven deriving Show
 data Date = Date Calendar (Maybe Word) (Maybe Word) Year deriving Show
 data DatePeriod = DateFrom Date (Maybe Date) | DateTo Date deriving Show
 data MapCoord = MapCoord Longitude Latitude deriving Show
+data Name = Name T.Text (Maybe T.Text) deriving Show -- Name fullname surname_only
 data Parent = Husband | Wife | BothParents deriving Show
 data Pedigree = Adopted | ByBirth | Foster | Sealing deriving Show
 data PhoneticPlaceName = PhoneticPlaceName PhoneticType [T.Text] deriving Show

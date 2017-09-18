@@ -110,7 +110,7 @@ gdOptionalXRefID :: Parser (Maybe GDXRefID)
 gdOptionalXRefID = gdXRefID <* gdDelim
 
 gdTag :: Parser GDTag
-gdTag = GDTag . T.pack <$> many gdAlphaNum
+gdTag = GDTag . T.toUpper . T.pack <$> many gdAlphaNum
 
 gdTerminator :: Parser String
 gdTerminator = string "\n" <|> string "\r" <|> string "\r\n" <|> string "\n\r"

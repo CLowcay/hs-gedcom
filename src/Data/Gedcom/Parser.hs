@@ -274,8 +274,7 @@ parsePlace :: StructureParser Place
 parsePlace = parseTag (GDTag "PLAC")$ \(t, children) ->
   runMultiMonad children$ Place
     <$> (pure$ T.splitOn "," . gdIgnoreEscapes$ t)
-    <*> parseOptional ((fmap.fmap.fmap) (T.splitOn ",")$
-      parseTextTag (GDTag "FORM"))
+    <*> parseOptional (parseListTag (GDTag "FORM"))
     <*> parseOptional parsePhoneticPlaceName
     <*> parseOptional parseRomanPlaceName
     <*> parseOptional parseMapCoord
@@ -284,29 +283,29 @@ parsePlace = parseTag (GDTag "PLAC")$ \(t, children) ->
 parsePhoneticPlaceName :: StructureParser PhoneticPlaceName
 parsePhoneticPlaceName = parseTag (GDTag "FONE")$ \(t, children) ->
   runMultiMonad children$ PhoneticPlaceName
-    <$> parseRequired (GDTag "TYPE")
-      ((fmap.fmap.fmap) getPhoneticType$ parseTextTag (GDTag "TYPE"))
+    <$> parseRequired (GDTag "TYPE") parsePhoneticType
     <*> (pure . T.splitOn "," . gdIgnoreEscapes$ t)
 
 parseRomanPlaceName :: StructureParser RomanPlaceName
 parseRomanPlaceName = parseTag (GDTag "ROMN")$ \(t, children) ->
   runMultiMonad children$ RomanPlaceName
-    <$> parseRequired (GDTag "TYPE")
-      ((fmap.fmap.fmap) getRomanType$ parseTextTag (GDTag "TYPE"))
+    <$> parseRequired (GDTag "TYPE") parseRomanType
     <*> (pure . T.splitOn "," . gdIgnoreEscapes$ t)
 
-getPhoneticType :: T.Text -> PhoneticType
-getPhoneticType t = case trim . T.toUpper$ t of
-  "HANGUL" -> Hangul
-  "KANA" -> Kana
-  v -> PhoneticType v
+parsePhoneticType :: StructureParser PhoneticType
+parsePhoneticType = parseTag (GDTag "TYPE")$ \(t, _) ->
+  return$ case trim . T.toUpper . gdIgnoreEscapes$ t of
+    "HANGUL" -> Hangul
+    "KANA" -> Kana
+    v -> PhoneticType v
 
-getRomanType :: T.Text -> RomanType
-getRomanType t = case trim . T.toUpper$ t of
-  "PINYIN" -> Pinyin
-  "ROMAJI" -> Romaji
-  "WADEGILES" -> WadeGiles
-  v -> RomanType v
+parseRomanType :: StructureParser RomanType
+parseRomanType = parseTag (GDTag "TYPE")$ \(t, _) ->
+  return$ case trim . T.toUpper . gdIgnoreEscapes$ t of
+    "PINYIN" -> Pinyin
+    "ROMAJI" -> Romaji
+    "WADEGILES" -> WadeGiles
+    v -> RomanType v
 
 parseMapCoord :: StructureParser MapCoord
 parseMapCoord = parseTag (GDTag "MAP")$ \(_, children) ->
@@ -328,7 +327,54 @@ parseLongLat tag p n = parseTag tag$ \(t, _) ->
         "Badly formatted longitude/latitude" <> (T.show t)
 
 parsePersonalName :: StructureParser PersonalName
-parsePersonalName = undefined
+parsePersonalName = parseTag (GDTag "NAME")$ \(n, children) ->
+  runMultiMonad children$ PersonalName
+    <$> (pure.getPersonalName.gdIgnoreEscapes$ n)
+    <*> parseOptional parseNameType
+    <*> parseNamePieces
+    <*> parseMulti parsePhoneticName
+    <*> parseMulti parseRomanName
+    
+getPersonalName :: T.Text -> Name
+getPersonalName = Name <$> (T.filter (/= '/')) <*> (parseMaybe parser)
+  where parser :: Parser T.Text
+        parser = (many$ noneOf ['/']) *> (T.pack <$> many (noneOf ['/']))
+
+parseNameType :: StructureParser NameType
+parseNameType = parseTag (GDTag "TYPE")$ \(t', _) ->
+  let t = gdIgnoreEscapes t'
+  in return . fromMaybe (NameType t) . parseMaybe parser $ t
+  where parser :: Parser NameType
+        parser =     (AKA <$ string' "aka")
+                 <|> (BirthName <$ string' "birth")
+                 <|> (Immigrant <$ string' "immigrant")
+                 <|> (Maiden <$ string' "maiden")
+                 <|> (Married <$ string' "married")
+
+parseNamePieces :: MultiMonad PersonalNamePieces
+parseNamePieces = PersonalNamePieces
+  <$> (fromMaybe [] <$> parseOptional (parseListTag (GDTag "NPFX")))
+  <*> (fromMaybe [] <$> parseOptional (parseListTag (GDTag "GIVN")))
+  <*> (fromMaybe [] <$> parseOptional (parseListTag (GDTag "NICK")))
+  <*> (fromMaybe [] <$> parseOptional (parseListTag (GDTag "SPFX")))
+  <*> (fromMaybe [] <$> parseOptional (parseListTag (GDTag "SURN")))
+  <*> (fromMaybe [] <$> parseOptional (parseListTag (GDTag "NSFX")))
+  <*> parseMulti parseNote
+  <*> parseMulti parseSourceCitation
+
+parsePhoneticName :: StructureParser PhoneticName
+parsePhoneticName = parseTag (GDTag "FONE")$ \(t, children) ->
+  runMultiMonad children$ PhoneticName
+    <$> (pure.getPersonalName.gdIgnoreEscapes$ t)
+    <*> parseRequired (GDTag "TYPE") parsePhoneticType
+    <*> parseNamePieces
+
+parseRomanName :: StructureParser RomanizedName
+parseRomanName = parseTag (GDTag "FONE")$ \(t, children) ->
+  runMultiMonad children$ RomanizedName
+    <$> (pure.getPersonalName.gdIgnoreEscapes$ t)
+    <*> parseRequired (GDTag "TYPE") parseRomanType
+    <*> parseNamePieces
 
 parseSex :: StructureParser Sex
 parseSex = parseTag (GDTag "SEX")$ \(t, _) ->
@@ -359,8 +405,7 @@ parseSourceRecordedEvent = parseTag (GDTag "EVEN")$ \(recorded, children) ->
    <$> (pure . catMaybes . fmap getEventType
      . T.splitOn "," . gdIgnoreEscapes$ recorded)
    <*> parseOptional fullParseDatePeriod
-   <*> parseOptional
-     ((fmap.fmap.fmap) (T.splitOn ",")$ parseTextTag (GDTag "PLAC"))
+   <*> parseOptional (parseListTag (GDTag "PLAC"))
    where
     fullParseDatePeriod = parseTag (GDTag "DATE")$ \(date, _) ->
       case parseDatePeriod date of
@@ -741,6 +786,10 @@ parseIntTag tag = parseTag tag$ \(v, _) ->
 
 parseTextTag :: GDTag -> StructureParser T.Text
 parseTextTag tag = parseTag tag (return.gdIgnoreEscapes.fst)
+
+parseListTag :: GDTag -> StructureParser [T.Text]
+parseListTag tag =
+  parseTag tag (return . T.splitOn "," . gdIgnoreEscapes . fst)
 
 parseTag :: Typeable a => GDTag -> NoLinkTagHandler a -> StructureParser a
 parseTag tag nl = parseTagFull tag$ noLink nl
