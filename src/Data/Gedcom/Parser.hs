@@ -391,10 +391,37 @@ parseIndividualAttribute :: StructureParser IndividualAttribute
 parseIndividualAttribute = undefined
 
 parseChildToFamilyLink :: StructureParser ChildToFamilyLink
-parseChildToFamilyLink = undefined
+parseChildToFamilyLink = parseTagFull (GDTag "FAMC")$ \(lb, children) ->
+  case lb of
+    Right _ -> throwError.XRefError$ "Missing link in FAMC"
+    Left f -> runMultiMonad children$ f
+      <$> parseOptional parsePedigree
+      <*> parseOptional parseChildLinkStatus
+      <*> parseMulti parseNote
+
+parsePedigree :: StructureParser Pedigree
+parsePedigree = parseTag (GDTag "PEDI")$ \(t, _) ->
+  case trim . T.toUpper . gdIgnoreEscapes$ t of
+    "ADOPTED" -> return Adopted
+    "BIRTH" -> return ByBirth
+    "FOSTER" -> return Foster
+    "SEALING" -> return Sealing
+    _ -> throwError.XRefError$ "Invalid pedigree code " <> (T.show t)
+
+parseChildLinkStatus :: StructureParser ChildLinkStatus
+parseChildLinkStatus = parseTag (GDTag "STAT")$ \(t, _) ->
+  case trim . T.toUpper . gdIgnoreEscapes$ t of
+    "CHALLENGED" -> return Challenged
+    "DISPROVEN" -> return Disproved
+    "PROVEN" -> return Proven
+    _ -> throwError.XRefError$ "Invalid child link status " <> (T.show t)
 
 parseSpouseToFamilyLink :: StructureParser SpouseToFamilyLink
-parseSpouseToFamilyLink = undefined
+parseSpouseToFamilyLink = parseTagFull (GDTag "FAMS")$ \(lb, children) ->
+  case lb of
+    Right _ -> throwError.XRefError$ "Missing link in FAMS"
+    Left f -> runMultiMonad children$ SpouseToFamilyLink f
+      <$> parseMulti parseNote
 
 parseAssociation :: StructureParser Association
 parseAssociation = parseTagFull (GDTag "ASSO")$ \(lb, children) ->
