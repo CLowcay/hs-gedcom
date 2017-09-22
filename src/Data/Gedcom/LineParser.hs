@@ -87,7 +87,7 @@ gdEscapeText :: Parser String
 gdEscapeText = concat <$> many gdAnyChar
 
 gdLevel :: Parser GDLevel
-gdLevel = GDLevel . read <$> count' 1 2 digitChar
+gdLevel = GDLevel . read <$> count' 1 2 digitChar <* gdDelim
 
 gdLineItem :: Parser GDLineItem
 gdLineItem = fmap GDLineItem . some$
@@ -139,14 +139,14 @@ gdExpandPointer pid v = case v of
 
 gdLineLevel :: GDXRefID -> GDLevel -> Parser GDLine
 gdLineLevel pid n = do
-  (GDLine n' xrid tag v) <- try gdLine
+  (GDLine n' xrid tag v) <- gdLine
   when (n' /= n)$ fail$ "Saw a " ++ (show tag) ++
     " tag at level " ++ (show n') ++
     " but expected level was " ++ (show n)
   return$ GDLine n' (fmap (gdExpandID pid) xrid) tag (fmap (gdExpandPointer pid) v)
 
 gdTree :: GDXRefID -> GDLevel -> Parser GDTree
-gdTree pid n = do
+gdTree pid n = try$ do
   line@(GDLine _ pid' _ _) <- gdLineLevel pid n
   GDTree line <$> many (gdTree (fromMaybe pid pid') (n + 1))
 

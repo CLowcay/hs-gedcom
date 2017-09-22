@@ -11,7 +11,7 @@ import Data.Time.Clock
 import qualified Data.Text.All as T
 import Text.Megaparsec
 
-type Parser = Parsec () T.Text
+type Parser = Parsec Dec T.Text
 
 infixl 1 <&>
 (<&>) :: Functor f => f a -> (a -> b) -> f b

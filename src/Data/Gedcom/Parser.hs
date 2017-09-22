@@ -25,8 +25,10 @@ import qualified Data.Map.Lazy as M
 import qualified Data.Text.All as T
 import Text.Megaparsec
 
-newtype GDStructure = GDStructure Dynamic
-data GDError = XRefError T.Text deriving Show
+newtype GDStructure = GDStructure Dynamic deriving Show
+data GDError = XRefError T.Text
+  | FormatError T.Text
+  | TagError T.Text deriving Show
 
 parseReferredStructure :: GDTree -> LookupMonad GDStructure
 parseReferredStructure t@(GDTree (GDLine _ _ tag _) _) =
@@ -65,6 +67,21 @@ noText lh (Left l, children) = lh (l, children)
 noText _ (Right _, _) = throwError.XRefError$
   "Required link to " <> (T.show$ (Proxy :: Proxy b))
   <> " when parsing " <> (T.show$ (Proxy :: Proxy a))
+
+-- The root structure
+
+parseGedcom :: GDRoot -> Either GDError Gedcom
+parseGedcom root@(GDRoot children) = do
+  xrefs <- tieTheKnot$ computeXrefTable root
+  runLookup xrefs$ runMultiMonad children$ Gedcom
+    <$> parseRequired (GDTag "HEAD") parseHeader
+    <*> parseMulti parseFamily
+    <*> parseMulti (parseIndividual (GDTag "INDI"))
+    <*> parseMulti parseMultimedia
+    <*> parseMulti parseNote
+    <*> parseMulti parseRepository
+    <*> parseMulti parseSource
+    <*> parseMulti (parseSubmitter (GDTag "SUBM"))
 
 -- Header
 parseHeader :: StructureParser Header
@@ -212,7 +229,7 @@ parseSubmission = parseTag (GDTag "SUBN")$ \(_, children) ->
 parseRestrictionNotice :: StructureParser RestrictionNotice
 parseRestrictionNotice = parseTag (GDTag "RESN")$ \(t, _) ->
   case parseMaybe parser (gdIgnoreEscapes t) of
-    Nothing -> throwError.XRefError$
+    Nothing -> throwError.FormatError$
       "Bad restriction notice " <> (T.show t)
     Just r -> return r
   where parser :: Parser RestrictionNotice
@@ -321,12 +338,12 @@ parseMapCoord = parseTag (GDTag "MAP")$ \(_, children) ->
 parseLongLat :: GDTag -> Char -> Char -> StructureParser Double
 parseLongLat tag p n = parseTag tag$ \(t, _) ->
   case T.uncons . T.toUpper . gdIgnoreEscapes$ t of
-    Nothing -> throwError.XRefError$
+    Nothing -> throwError.FormatError$
       "Badly formatted longitude/latitude " <> (T.show t)
     Just (i, r) ->
       if i == p then return$ read . T.unpack$ r
       else if i == n then return$ negate . read . T.unpack$ r
-      else throwError.XRefError$
+      else throwError.FormatError$
         "Badly formatted longitude/latitude" <> (T.show t)
 
 parsePersonalName :: StructureParser PersonalName
@@ -385,7 +402,7 @@ parseSex = parseTag (GDTag "SEX")$ \(t, _) ->
     "M" -> return Male
     "F" -> return Female
     "U" -> return Undetermined
-    _ -> throwError.XRefError$ "Unknown sex code " <> (T.show t)
+    _ -> throwError.FormatError$ "Unknown sex code " <> (T.show t)
   
 parseIndividualAttribute :: MultiMonad [IndividualAttribute]
 parseIndividualAttribute = do
@@ -461,7 +478,7 @@ parseIndividualEvent = do
         "HUSB" -> return Husband
         "WIFE" -> return Wife
         "BOTH" -> return BothParents
-        _ -> throwError.XRefError$ "Invalid parent " <> (T.show t)
+        _ -> throwError.FormatError$ "Invalid parent " <> (T.show t)
 
 parseIndividualEventDetail :: MultiMonad IndividualEventDetail
 parseIndividualEventDetail = IndividualEventDetail
@@ -485,7 +502,7 @@ parsePedigree = parseTag (GDTag "PEDI")$ \(t, _) ->
     "BIRTH" -> return ByBirth
     "FOSTER" -> return Foster
     "SEALING" -> return Sealing
-    _ -> throwError.XRefError$ "Invalid pedigree code " <> (T.show t)
+    _ -> throwError.FormatError$ "Invalid pedigree code " <> (T.show t)
 
 parseChildLinkStatus :: StructureParser ChildLinkStatus
 parseChildLinkStatus = parseTag (GDTag "STAT")$ \(t, _) ->
@@ -493,7 +510,7 @@ parseChildLinkStatus = parseTag (GDTag "STAT")$ \(t, _) ->
     "CHALLENGED" -> return Challenged
     "DISPROVEN" -> return Disproved
     "PROVEN" -> return Proven
-    _ -> throwError.XRefError$ "Invalid child link status " <> (T.show t)
+    _ -> throwError.FormatError$ "Invalid child link status " <> (T.show t)
 
 parseSpouseToFamilyLink :: StructureParser SpouseToFamilyLink
 parseSpouseToFamilyLink = parseTagFull (GDTag "FAMS")$ \(lb, children) ->
@@ -522,7 +539,7 @@ parseSourceRecordedEvent = parseTag (GDTag "EVEN")$ \(recorded, children) ->
     fullParseDatePeriod = parseTag (GDTag "DATE")$ \(date, _) ->
       case parseDatePeriod date of
         Just v -> return v
-        Nothing -> throwError.XRefError$
+        Nothing -> throwError.FormatError$
           "Badly formatted date period: " <> (T.show date)
 
 parseRepositoryCitation :: StructureParser RepositoryCitation
@@ -606,7 +623,7 @@ parseDateValue = parseTag (GDTag "DATE")$ \(t, _) ->
          <|> (DateV <$> parseDate t)
   in case date of
     Just x -> return x
-    Nothing -> throwError.XRefError$ "Invalid date format " <> (T.show t)
+    Nothing -> throwError.FormatError$ "Invalid date format " <> (T.show t)
 
 decodeCalendarEscape :: Maybe GDEscape -> Calendar
 decodeCalendarEscape Nothing = Gregorian
@@ -753,7 +770,7 @@ getDate calendar = parseMaybe parser
 parseExactDate :: StructureParser UTCTime
 parseExactDate = parseTag (GDTag "DATE")$ \(date, _) ->
   case parseMaybe dateExact (gdIgnoreEscapes date) of
-    Nothing -> throwError.XRefError$ "Bad date \"" <> (T.show date) <> "\""
+    Nothing -> throwError.FormatError$ "Bad date \"" <> (T.show date) <> "\""
     Just (d, m, y) ->
       return$ UTCTime
         (fromGregorian (fromIntegral y) (fromIntegral m) d)
@@ -766,12 +783,12 @@ parseExactDateTime = parseTag (GDTag "DATE")$ \(date, children) -> do
   dt <- case mtime of
     Nothing -> return$ secondsToDiffTime 0
     Just t -> case parseMaybe timeValue t of
-      Nothing -> throwError.XRefError$ "Bad time \"" <> (T.show t) <> "\""
+      Nothing -> throwError.FormatError$ "Bad time \"" <> (T.show t) <> "\""
       Just Nothing -> return$ secondsToDiffTime 0
       Just (Just time) -> return$ timeToPicos time
 
   case parseMaybe dateExact (gdIgnoreEscapes date) of
-    Nothing -> throwError.XRefError$ "Bad date \"" <> (T.show date) <> "\""
+    Nothing -> throwError.FormatError$ "Bad date \"" <> (T.show date) <> "\""
     Just (d, m, y) -> return$ UTCTime
       (fromGregorian (fromIntegral y) (fromIntegral m) d) dt
 
@@ -801,7 +818,7 @@ parseMultimediaFile typeTag mf = parseTag (GDTag "FILE")$ \(name, children) -> d
     <$> parseOptional (parseMultimediaFormat typeTag)
     <*> parseOptional (parseTextTag (GDTag "TITL"))
   case mc <|> mf of
-    Nothing -> throwError.XRefError$ "Missing FORM tag for file format"
+    Nothing -> throwError.TagError$ "Missing FORM tag for file format"
     Just c -> return$ MultimediaFile (gdIgnoreEscapes name) c title
 
 parseMultimediaFormat :: GDTag -> StructureParser MultimediaFormat
@@ -946,7 +963,7 @@ parseQuality = (fmap.fmap.fmap) (QualityAssessment . fromIntegral)$
 parseBoolTag :: GDTag -> StructureParser Bool
 parseBoolTag tag = parseTag tag$ \(v, _) ->
   case parseMaybe ynParser (gdIgnoreEscapes v) of
-    Nothing -> throwError.XRefError$ "Expected boolean, saw " <> (T.show v)
+    Nothing -> throwError.FormatError$ "Expected boolean, saw " <> (T.show v)
     Just yn -> return yn
   where
     ynParser :: Parser Bool
@@ -955,7 +972,7 @@ parseBoolTag tag = parseTag tag$ \(v, _) ->
 parseIntTag :: GDTag -> StructureParser Int
 parseIntTag tag = parseTag tag$ \(v, _) ->
   case parseMaybe parser (gdIgnoreEscapes v) of
-    Nothing -> throwError.XRefError$ "Expected number, saw " <> (T.show v)
+    Nothing -> throwError.FormatError$ "Expected number, saw " <> (T.show v)
     Just n -> return . read $ n
   where
     parser :: Parser String
@@ -1041,7 +1058,7 @@ parseRequired tag p = do
   r <- parseOptional p
   case r of
     Just v -> return v
-    Nothing -> throwError.XRefError$
+    Nothing -> throwError.TagError$
       "Could not find required " <> (T.show tag) <> " tag"
 
 -- The LookupMonad
