@@ -598,7 +598,15 @@ parseAddress contacts = parseTag (GDTag "ADDR")$ \(addr, children) ->
 -- Values
 
 parseDateValue :: StructureParser DateValue
-parseDateValue = undefined
+parseDateValue = parseTag (GDTag "DATE")$ \(t, _) ->
+  let date = (DateApproxV <$> parseDateApprox t)
+         <|> (DateRangeV <$> parseDateRange t)
+         <|> (DatePeriodV <$> parseDatePeriod t)
+         <|> (parseDatePhrase t)
+         <|> (DateV <$> parseDate t)
+  in case date of
+    Just x -> return x
+    Nothing -> throwError.XRefError$ "Invalid date format " <> (T.show t)
 
 decodeCalendarEscape :: Maybe GDEscape -> Calendar
 decodeCalendarEscape Nothing = Gregorian
@@ -652,6 +660,62 @@ parseDatePeriod t = case prepareDateText t of
                       <$> getDate calendar1 mfdate
                       <*> (pure$ getDate calendar2 r2)
             _ -> Nothing
+  _ -> Nothing
+
+parseDateRange :: [(Maybe GDEscape, T.Text)] -> Maybe DateRange
+parseDateRange t = case prepareDateText t of
+  ((mCalendarEscape1, t1):rest) ->
+    let
+      calendar1 = decodeCalendarEscape mCalendarEscape1
+      (pref, date1) = second trim . T.splitAt 3 . T.toUpper . trim $ t1
+    in case pref of
+      "BEF" -> DateBefore <$> getDate calendar1 date1
+      "AFT" -> DateAfter <$> getDate calendar1 date1
+      "BET" -> case T.splitOn "AND" date1 of
+        [d1, date2'] -> DateBetween
+          <$> getDate calendar1 d1
+          <*> getDate calendar1 (trim date2')
+        [d1] -> case rest of
+          [] -> Nothing
+          ((mCalendarEscape2, t2):_) ->
+            let calendar2 = decodeCalendarEscape mCalendarEscape2
+            in DateBetween
+              <$> getDate calendar1 d1
+              <*> getDate calendar2 (trim t2)
+        _ -> Nothing
+      _ -> Nothing
+  _ -> Nothing
+
+parseDateApprox :: [(Maybe GDEscape, T.Text)] -> Maybe DateApprox
+parseDateApprox t = case prepareDateText t of
+  ((mCalendarEscape1, t1):_) ->
+    let
+      calendar1 = decodeCalendarEscape mCalendarEscape1
+      (pref, date) = second trim . T.splitAt 3 . T.toUpper . trim $ t1
+      cons = case pref of
+        "ABT" -> Just DateAbout
+        "CAL" -> Just DateCalculated
+        "EST" -> Just DateEstimated
+        _ -> Nothing
+    in cons <*> getDate calendar1 date
+  _ -> Nothing
+
+parseDatePhrase :: [(Maybe GDEscape, T.Text)] -> Maybe DateValue
+parseDatePhrase t = case prepareDateText t of
+  ((mCalendarEscape1, t1):_) ->
+    let
+      calendar1 = decodeCalendarEscape mCalendarEscape1
+      int = trim <$> T.stripPrefix "INT" t1
+      opp = trim <$> T.stripPrefix "(" t1
+    in case int of
+      Nothing -> case opp of
+        Nothing -> Nothing
+        Just phrase -> Just$
+          DatePhrase Nothing (trim . T.dropEnd 1$ phrase)
+      Just rest -> case trim <$> T.splitOn "(" rest of
+        [date, phrase] -> Just$ 
+          DatePhrase (getDate calendar1 date) (trim . T.dropEnd 1$ phrase)
+        _ -> Nothing
   _ -> Nothing
 
 parseDate :: [(Maybe GDEscape, T.Text)] -> Maybe Date
