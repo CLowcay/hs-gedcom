@@ -128,7 +128,7 @@ parseIndividual tag = parseTag tag$ \(_, children) ->
     <$> parseOptional parseRestrictionNotice
     <*> parseOptional parsePersonalName
     <*> parseOptional parseSex
-    <*> parseMulti parseIndividualEvent
+    <*> parseIndividualEvent
     <*> parseIndividualAttribute
     <*> parseMulti parseChildToFamilyLink
     <*> parseMulti parseSpouseToFamilyLink
@@ -409,8 +409,59 @@ parseIndividualAttribute = do
       runMultiMonad children$ IndividualAttribute (mkType$ gdIgnoreEscapes t)
         <$> parseIndividualEventDetail
 
-parseIndividualEvent :: StructureParser IndividualEvent
-parseIndividualEvent = undefined
+parseIndividualEvent :: MultiMonad [IndividualEvent]
+parseIndividualEvent = do
+    famc <- concat <$> mapM (parseMulti.famcTag)
+      [(GDTag "BIRT", Birth), (GDTag "CHR", Christening)]
+    adop <- parseMulti.parseTag (GDTag "ADOP")$ \(_, children) ->
+      runMultiMonad children$ IndividualEvent
+        <$> (Adoption <$> parseOptional parseAdopFamilyRef)
+        <*> parseIndividualEventDetail
+    simple <- concat <$> mapM (parseMulti.eventTag) [
+      (GDTag "DEAT", const Death),
+      (GDTag "BURI", const Burial),
+      (GDTag "CREM", const Cremation),
+      (GDTag "BAPM", const Baptism),
+      (GDTag "BARM", const BarMitzvah),
+      (GDTag "BASM", const BasMitzvah),
+      (GDTag "BLES", const Blessing),
+      (GDTag "CHRA", const ChristeningAdult),
+      (GDTag "CONF", const Confirmation),
+      (GDTag "FCOM", const FirstCommunion),
+      (GDTag "ORDN", const Ordination),
+      (GDTag "NATU", const Naturalization),
+      (GDTag "EMIG", const Emigration),
+      (GDTag "IMMI", const Immigration),
+      (GDTag "CENS", const IndvCensus),
+      (GDTag "PROB", const Probate),
+      (GDTag "WILL", const Will),
+      (GDTag "GRAD", const Graduation),
+      (GDTag "RETI", const Retirement),
+      (GDTag "EVEN", IndividualEventType)]
+    return$ famc ++ adop ++ simple
+  where
+    eventTag (tag, mkType) = parseTag tag$ \(t, children) ->
+      runMultiMonad children$ IndividualEvent (mkType$ gdIgnoreEscapes t)
+        <$> parseIndividualEventDetail
+    famcTag (tag, mkType) = parseTag tag$ \(_, children) ->
+      runMultiMonad children$ IndividualEvent
+        <$> (mkType <$> parseOptional parseFamilyRef)
+        <*> parseIndividualEventDetail
+    parseFamilyRef = parseTagFull (GDTag "FAMC")$ \(lb, _) ->
+      case lb of
+        Right _ -> throwError.XRefError$ "Mssing link in FAMC"
+        Left f -> return f
+    parseAdopFamilyRef = parseTagFull (GDTag "FAMC")$ \(lb, children) ->
+      case lb of
+        Right _ -> throwError.XRefError$ "Mssing link in FAMC"
+        Left f -> runMultiMonad children$
+          AdoptionDetail f <$> parseOptional parseParent
+    parseParent = parseTag (GDTag "ADOP")$ \(t, _) ->
+      case trim . T.toUpper . gdIgnoreEscapes $ t of
+        "HUSB" -> return Husband
+        "WIFE" -> return Wife
+        "BOTH" -> return BothParents
+        _ -> throwError.XRefError$ "Invalid parent " <> (T.show t)
 
 parseIndividualEventDetail :: MultiMonad IndividualEventDetail
 parseIndividualEventDetail = IndividualEventDetail

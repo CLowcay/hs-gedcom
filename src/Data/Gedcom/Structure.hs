@@ -230,7 +230,7 @@ data IndividualEventDetail = IndividualEventDetail {
 
 data IndividualEvent = IndividualEvent {
   individualEventType :: IndividualEventType,
-  individualEventDetail :: Maybe IndividualEventDetail
+  individualEventDetail :: IndividualEventDetail
 } deriving Show
 
 data Place = Place {
@@ -369,7 +369,7 @@ data FamilyEventType =
 
 data IndividualEventType =
     Birth (Maybe Family) | Christening (Maybe Family) | Death | Burial
-  | Cremation | Adoption (Maybe Parent) | Baptism | BarMitzvah
+  | Cremation | Adoption (Maybe AdoptionDetail) | Baptism | BarMitzvah
   | BasMitzvah | Blessing | ChristeningAdult | Confirmation | FirstCommunion
   | Ordination | Naturalization | Emigration | Immigration | IndvCensus
   | Probate | Will | Graduation | Retirement | IndividualEventType T.Text
