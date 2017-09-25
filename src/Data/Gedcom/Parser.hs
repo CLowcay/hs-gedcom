@@ -43,7 +43,7 @@ parseReferredStructure t@(GDTree (GDLine _ _ tag _) _) =
       gd@(GDTag "SOUR") -> makeDynamic gd$ parseSource
       gd@(GDTag "FAM" ) -> makeDynamic gd$ parseFamily
       gd@(GDTag "OBJE") -> makeDynamic gd$ parseMultimediaRecord
-      _ -> \_ -> throwError.XRefError$ "Invalid reference to " <> (T.show tag)
+      _ -> \_ -> throwError.TagError$ (T.show tag) <> " cannot be labelled"
 
     makeDynamic :: Typeable a =>
       GDTag -> StructureParser a -> (GDTree -> LookupMonad Dynamic)
@@ -71,9 +71,9 @@ noText _ (Right _, _) = throwError.XRefError$
 -- The root structure
 
 parseGedcom :: GDRoot -> Either GDError Gedcom
-parseGedcom root@(GDRoot children) = do
-  xrefs <- tieTheKnot$ computeXrefTable root
-  runLookup xrefs$ runMultiMonad children$ Gedcom
+parseGedcom root@(GDRoot children) =
+  let xrefs = tieTheKnot$ computeXrefTable root
+  in runLookup xrefs$ runMultiMonad children$ Gedcom
     <$> parseRequired (GDTag "HEAD") parseHeader
     <*> parseMulti parseFamily
     <*> parseMulti (parseIndividual (GDTag "INDI"))
@@ -545,7 +545,7 @@ parseSourceRecordedEvent = parseTag (GDTag "EVEN")$ \(recorded, children) ->
 parseRepositoryCitation :: StructureParser RepositoryCitation
 parseRepositoryCitation = parseTagFull (GDTag "REPO")$ \(lb, children) ->
   let repo = case lb of
-               Left v -> v
+               Left v -> Just v
                Right _ -> Nothing
   in runMultiMonad children$ RepositoryCitation repo
     <$> parseMulti parseNote
@@ -661,11 +661,11 @@ parseDatePeriod t = case prepareDateText t of
           let topcs = T.splitOn "TO"$ r
           in case topcs of
             [mfdate, mto] -> DateFrom
-                <$> getDate calendar1 mfdate
+                <$> getDate calendar1 (trim mfdate)
                 <*> (pure$ getDate calendar1 (trim mto))
             [mfdate] -> case rest of
                 [] -> DateFrom
-                  <$> getDate calendar1 mfdate <*> (pure Nothing)
+                  <$> getDate calendar1 (trim mfdate) <*> (pure Nothing)
                 ((mCalendarEscape2, t2'):_) ->
                   let
                     calendar2 = decodeCalendarEscape mCalendarEscape2
@@ -674,8 +674,8 @@ parseDatePeriod t = case prepareDateText t of
                   in case to2 of
                     Nothing -> Nothing
                     Just r2 -> DateFrom
-                      <$> getDate calendar1 mfdate
-                      <*> (pure$ getDate calendar2 r2)
+                      <$> getDate calendar1 (trim mfdate)
+                      <*> (pure$ getDate calendar2 (trim r2))
             _ -> Nothing
   _ -> Nothing
 
@@ -752,15 +752,15 @@ getDate calendar = parseMaybe parser
       <$> yearParser <*> ((True <$ string' "B.C.") <|> pure False)
     parser :: Parser Date
     parser =
-      Date calendar
+      (try$ Date calendar
           <$> (Just . read <$> count' 1 2 digitChar)
           <*> (gdDelim >> (Just <$> parseMonth))
-          <*> (gdDelim >> parseYear)
-      <|> Date calendar Nothing
+          <*> (gdDelim >> parseYear))
+      <|> (try$ Date calendar Nothing
           <$> (gdDelim >> (Just <$> parseMonth))
-          <*> (gdDelim >> parseYear)
-      <|> Date calendar Nothing Nothing
-          <$> (gdDelim >> parseYear)
+          <*> (gdDelim >> parseYear))
+      <|> (Date calendar Nothing Nothing
+          <$> (gdDelim >> parseYear))
     parseMonth = case calendar of
                    Gregorian -> month
                    Julian -> month
@@ -1003,7 +1003,7 @@ parseTagFull tag handler t@(GDTree (GDLine _ _ tag' v) children) =
         Nothing -> do
           throwError.XRefError$ "Expected " <>
             (T.show$ typeRep (Proxy :: Proxy b))
-            <> " but found a " <> (T.show$ typeOf xdv)
+            <> " but found a " <> (T.show$ dynTypeRep xdv)
         Just xv -> Right <$> (handler (Left xv, children))
     Just (GDLineItemV l1) ->
       Right <$> (handler.(first Right)$ parseCont l1 children)
@@ -1044,14 +1044,17 @@ parseMulti p = MultiMonad$ do
 parseOptional :: StructureParser a -> MultiMonad (Maybe a)
 parseOptional p = MultiMonad$ do
   ls <- lift$ get
-  (mr, leftover) <- lift$ lift$ foldrM (\v (r, rest) ->
-    if isJust r then return (r, v:rest)
-    else (, rest).toMaybe <$> p v) (Nothing, []) ls
+  (mr, leftover) <-
+    lift$ lift$ foldrM (\v (r, rest) ->
+      if isJust r then return (r, v:rest)
+      else pick v rest.toMaybe <$> p v) (Nothing, []) ls
   lift$ put leftover
   return mr
   where
     toMaybe (Left _) = Nothing
     toMaybe (Right v) = Just v
+    pick v rest Nothing = (Nothing, v:rest)
+    pick _ rest x = (x, rest)
 
 parseRequired :: GDTag -> StructureParser a -> MultiMonad a
 parseRequired tag p = do
@@ -1064,10 +1067,12 @@ parseRequired tag p = do
 -- The LookupMonad
 
 newtype LookupMonad a =
-  LookupMonad (ExceptT GDError (Reader (M.Map GDXRefID GDStructure)) a)
+  LookupMonad (ExceptT GDError (Reader
+    (M.Map GDXRefID (Either GDError GDStructure))) a)
   deriving (Monad, Functor, Applicative, MonadError GDError)
 
-runLookup :: M.Map GDXRefID GDStructure -> LookupMonad a -> Either GDError a
+runLookup :: M.Map GDXRefID (Either GDError GDStructure) ->
+  LookupMonad a -> Either GDError a
 runLookup lm (LookupMonad m) = (flip runReader) lm.runExceptT$ m
 
 crossRef :: GDXRefID -> LookupMonad GDStructure
@@ -1075,14 +1080,13 @@ crossRef xrid = LookupMonad$ do
   r <- M.lookup xrid <$> (lift ask)
   case r of
     Nothing -> throwError$ XRefError (T.show xrid)
-    Just v -> return v
+    Just (Left err) -> throwError err
+    Just (Right v) -> return v
 
 tieTheKnot ::
   M.Map GDXRefID (LookupMonad GDStructure) ->
-  Either GDError (M.Map GDXRefID GDStructure)
-tieTheKnot mt = mdo
-  t <- mapM (runLookup t) mt
-  return t
+  M.Map GDXRefID (Either GDError GDStructure)
+tieTheKnot mt = let t = runLookup t <$> mt in t
 
 computeXrefTable :: GDRoot -> M.Map GDXRefID (LookupMonad GDStructure)
 computeXrefTable (GDRoot trees) =
