@@ -151,7 +151,8 @@ parseSource = parseTag (GDTag "SOUR")$ \(_, children) ->
 parseSubmitter :: GDTag -> StructureParser (GDRef Submitter)
 parseSubmitter tag = parseTag tag$ \(_, children) ->
   runMultiMonad children$ Submitter
-    <$> parseRequired (GDTag "NAME") parseName
+    <$> parseRequired (GDTag "NAME")
+      ((fmap.fmap.fmap) getPersonalName parseName)
     <*> (parseContactDetails >>= (parseOptional.parseAddress))
     <*> parseOptional parseMultimedia
     <*> parseMulti parseLanguage
@@ -304,9 +305,11 @@ parsePersonalName = parseNoLinkTag (GDTag "NAME")$ \(n, children) ->
     <*> parseMulti parseRomanName
     
 getPersonalName :: T.Text -> Name
-getPersonalName = Name <$> (T.filter (/= '/')) <*> (parseMaybe parser)
-  where parser :: Parser T.Text
-        parser = (many$ noneOf ['/']) *> (T.pack <$> many (noneOf ['/']))
+getPersonalName = Name <$> reformat <*> (getMiddle . T.splitOn "/")
+  where
+   reformat = T.unwords . T.words . T.map (\c -> if c == '/' then ' ' else c)
+   getMiddle [_, m, _] = Just$ trim m
+   getMiddle _ = Nothing
 
 parseNameType :: StructureParser NameType
 parseNameType = parseNoLinkTag (GDTag "TYPE")$ \(t', _) ->

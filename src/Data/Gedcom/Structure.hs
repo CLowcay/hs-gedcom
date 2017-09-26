@@ -157,7 +157,7 @@ data Submission = Submission {
 } deriving Show
 
 data Submitter = Submitter {
-  submitterName :: T.Text,
+  submitterName :: Name,
   submitterAddress :: Maybe Address,
   submitterMedia :: Maybe (GDRef Multimedia),
   submitterLang :: [Language],
