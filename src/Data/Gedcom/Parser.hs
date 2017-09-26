@@ -2,6 +2,19 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecursiveDo #-}
 {-# LANGUAGE TupleSections #-}
+
+{-|
+Module: Data.Gedcom.Parser
+Description: GEDCOM high level parsers
+Copyright: (c) Callum Lowcay, 2017
+License: BSD3
+Maintainer: cwslowcay@gmail.com
+Stability: experimental
+Portability: GHC
+
+These parsers extract the GEDCOM records from the raw syntax tree.
+
+-}
 module Data.Gedcom.Parser where
 
 import Control.Applicative

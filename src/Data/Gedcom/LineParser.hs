@@ -1,5 +1,18 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+
+{-|
+Module: Data.Gedcom.LineParser
+Description: Low-level GEDCOM parser
+Copyright: (c) Callum Lowcay, 2017
+License: BSD3
+Maintainer: cwslowcay@gmail.com
+Stability: experimental
+Portability: GHC
+
+This module parses a Text string into a GEDCOM syntax tree.
+
+-}
 module Data.Gedcom.LineParser where
 
 import Control.Monad

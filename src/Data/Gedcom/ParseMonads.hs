@@ -1,5 +1,19 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
+
+{-|
+Module: Data.Gedcom.ParseMonads
+Description: Monads for parsing GEDCOM records
+Copyright: (c) Callum Lowcay, 2017
+License: BSD3
+Maintainer: cwslowcay@gmail.com
+Stability: experimental
+Portability: GHC
+
+This module contains monads and utility functions for extracting GEDCOM records
+from the raw syntax tree.
+
+-}
 module Data.Gedcom.ParseMonads where
 
 import Control.Monad

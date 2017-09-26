@@ -1,3 +1,12 @@
+{-|
+Module: Data.Gedcom.Internal.Common
+Description: Common utility functions for parsing
+Copyright: (c) Callum Lowcay, 2017
+License: BSD3
+Maintainer: cwslowcay@gmail.com
+Stability: experimental
+Portability: GHC
+-}
 module Data.Gedcom.Internal.Common
   ((<&>), withDefault, trim, Parser, timeToPicos, timeValue,
   dateExact, month, monthFr, monthHeb, yearGreg

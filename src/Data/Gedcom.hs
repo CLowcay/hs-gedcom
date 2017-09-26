@@ -1,12 +1,24 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+
+{-|
+Module: Data.Gedcom
+Description: Parser for the GEDCOM genealogy  format
+Copyright: (c) Callum Lowcay, 2017
+License: BSD3
+Maintainer: cwslowcay@gmail.com
+Stability: experimental
+Portability: GHC
+-}
 module Data.Gedcom (
-  module Data.Gedcom.Structure,
-  GDRefError (..),
-  GDError (..),
-  XRefTable, gdLookup,
+  -- * Functions
   parseGedcomString,
-  parseGedcomFile
+  parseGedcomFile,
+  GDError (..),
+  gdLookup,
+  GDRef, XRefTable,
+  GDRefError (..), GDXRefID,
+  module Data.Gedcom.Structure
 ) where
 
 import Control.Applicative
@@ -25,10 +37,14 @@ import qualified Data.Map as M
 import qualified Data.Text.All as T
 import Text.Megaparsec
 
+-- | A table of cross references
 newtype XRefTable = XRefTable (M.Map GDXRefID Dynamic) deriving Show
 
-gdLookup :: forall a. Typeable a =>
-  GDRef a -> XRefTable -> Either GDRefError a
+-- | Lookup up a reference in the cross reference table
+gdLookup :: forall a. Typeable a
+  => GDRef a             -- ^ The reference to look up
+  -> XRefTable           -- ^ The table to look up in
+  -> Either GDRefError a -- ^ The value or an error
 gdLookup (GDStructure x) _ = Right x
 gdLookup (GDXRef thisID) (XRefTable table) =
   case M.lookup thisID table of
@@ -38,8 +54,11 @@ gdLookup (GDXRef thisID) (XRefTable table) =
         WrongRefType (dynTypeRep dynamic) (typeRep (Proxy :: Proxy a))
       Just v -> Right v
 
+-- | Parse Gedcom data from a ByteString
 parseGedcomString ::
-  Maybe String -> B.ByteString -> Either GDError (Gedcom, XRefTable)
+     Maybe String  -- ^ The filename from which the string was read
+  -> B.ByteString  -- ^ The string to parse
+  -> Either GDError (Gedcom, XRefTable) -- ^ The Gedcom data and cross reference table, or an error
 parseGedcomString mfilename intext =
   let
     filename = fromMaybe "<<NO FILE>>" mfilename
@@ -75,6 +94,9 @@ parseGedcomString mfilename intext =
         _ -> Nothing
     getCharset _ = Nothing
 
-parseGedcomFile :: FilePath -> IO (Either GDError (Gedcom, XRefTable))
+-- | Parse Gedcom data from a file
+parseGedcomFile ::
+  FilePath -- ^ The file to read
+  -> IO (Either GDError (Gedcom, XRefTable)) -- ^ The Gedcom data and cross reference table, or an error
 parseGedcomFile path = parseGedcomString (Just path) <$> B.readFile path
 

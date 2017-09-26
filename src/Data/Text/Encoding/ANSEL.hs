@@ -1,4 +1,23 @@
-module Data.Text.Encoding.ANSEL where
+{-|
+Module: Data.Text.Encoding.ANSEL
+Description: Decoder for the ANSEL character encoding
+Copyright: (c) Callum Lowcay, 2017
+License: BSD3
+Maintainer: cwslowcay@gmail.com
+Stability: experimental
+Portability: GHC
+
+ANSEL <https://en.wikipedia.org/wiki/ANSEL> is a character set and associated
+encodings intended for bibliographic purposes.  GEDCOM files use the 8-bit
+ANSEL encoding by default, so we need a way to decode it.  ANSEL has combining
+diacritics, but they precede the character that they modify (Unicode has it the
+other way around).  This means that the code points must be reordered when
+converting to Unicode.
+
+-}
+module Data.Text.Encoding.ANSEL (
+  decodeANSEL
+) where
 
 import Control.Monad.Loops (whileM)
 import Control.Monad.State (State, evalState, get, put)
@@ -7,7 +26,10 @@ import Data.Word
 import qualified Data.ByteString as B
 import qualified Data.Text.All as T
 
-decodeANSEL :: B.ByteString -> T.Text
+-- | Decode an ANSEL string to Unicode
+decodeANSEL ::
+  B.ByteString -- ^ The string to encode
+  -> T.Text    -- ^ Unicode text
 decodeANSEL bs = T.pack . concat .
   evalState (whileM ((not.null) <$> get) decodeANSELChar)$ B.unpack bs
 
