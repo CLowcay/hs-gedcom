@@ -1,5 +1,6 @@
 module Data.Gedcom.Structure where
 
+import Data.Gedcom.Common
 import Data.Time.Clock
 import qualified Data.Text.All as T
 
@@ -7,13 +8,13 @@ import qualified Data.Text.All as T
 
 data Gedcom = Gedcom {
   gedcomHeader :: Header,
-  gedcomFamily :: [Family],
-  gedcomIndividual :: [Individual],
-  gedcomMultimedia :: [Multimedia],
-  gedcomNote :: [Note],
-  gedcomRepository :: [Repository],
-  gedcomSource :: [Source],
-  gedcomSubmitter :: [Submitter]
+  gedcomFamily :: [GDRef Family],
+  gedcomIndividual :: [GDRef Individual],
+  gedcomMultimedia :: [GDRef Multimedia],
+  gedcomNote :: [GDRef Note],
+  gedcomRepository :: [GDRef Repository],
+  gedcomSource :: [GDRef Source],
+  gedcomSubmitter :: [GDRef Submitter]
 } deriving Show
 
 -- The header
@@ -22,8 +23,8 @@ data Header = Header {
   headerSource :: HeaderSource,
   headerDestination :: Maybe T.Text,
   headerDate :: Maybe UTCTime,
-  headerSubmitter :: Submitter,
-  headerSubmission :: Maybe Submission,
+  headerSubmitter :: GDRef Submitter,
+  headerSubmission :: Maybe (GDRef Submission),
   headerFile :: Maybe FilePath,
   headerCopyright :: Maybe T.Text,
   headerGedcomFormat :: GedcomFormat,
@@ -65,17 +66,17 @@ data HeaderSourceData = HeaderSourceData {
 data Family = Family {
   familyRestrictionNotice :: Maybe RestrictionNotice,
   familyEvent :: [FamilyEvent],
-  familyHusband :: Maybe Individual,
-  familyWife :: Maybe Individual,
-  familyChildren :: [Individual],
+  familyHusband :: Maybe (GDRef Individual),
+  familyWife :: Maybe (GDRef Individual),
+  familyChildren :: [GDRef Individual],
   familyTotalChildren :: Maybe Word,
-  familySubitter :: [Submitter],
+  familySubitter :: [GDRef Submitter],
   familyUserReference :: [UserReference],
   familyRIN :: Maybe RIN,
   familyChangeDate :: Maybe ChangeDate,
-  familyNote :: [Note],
+  familyNote :: [GDRef Note],
   familySourceCitation :: [SourceCitation],
-  familyMultimedia :: [Multimedia]
+  familyMultimedia :: [GDRef Multimedia]
 } deriving Show
 
 data Individual = Individual {
@@ -86,19 +87,19 @@ data Individual = Individual {
   individualAttribute :: [IndividualAttribute],
   individualChildToFamilyLink :: [ChildToFamilyLink],
   individualSpouseToFamilyLink :: [SpouseToFamilyLink],
-  individualSubmitter :: [Submitter],
+  individualSubmitter :: [GDRef Submitter],
   individualAssociation :: [Association],
-  individualAlias :: [Individual],
-  individualAncestorInterest :: [Submitter],
-  individualDescendantInterest :: [Submitter],
+  individualAlias :: [GDRef Individual],
+  individualAncestorInterest :: [GDRef Submitter],
+  individualDescendantInterest :: [GDRef Submitter],
   individualRFN :: Maybe RFN,
   individualAFN :: Maybe AFN,
   individualUserReference :: [UserReference],
   individualRIN :: Maybe RIN,
   individualChangeDate :: Maybe ChangeDate,
-  individualNote :: [Note],
+  individualNote :: [GDRef Note],
   individualSourceCitation :: [SourceCitation],
-  individualMultimedia :: [Multimedia]
+  individualMultimedia :: [GDRef Multimedia]
 } deriving Show
 
 data Multimedia = Multimedia {
@@ -106,7 +107,7 @@ data Multimedia = Multimedia {
   multimediaTitl :: Maybe T.Text,
   multimediaUserReference :: [UserReference],
   multimediaRIN :: Maybe RIN,
-  multimediaNote :: [Note],
+  multimediaNote :: [GDRef Note],
   multimediaSourceCitation :: [SourceCitation],
   multimediaChangeDate :: Maybe ChangeDate
 } deriving Show
@@ -122,7 +123,7 @@ data Note = Note {
 data Repository = Repository {
   repositoryName :: T.Text,
   repositoryAddress :: Maybe Address,
-  repositoryNote :: [Note],
+  repositoryNote :: [GDRef Note],
   repositoryUserReference :: [UserReference],
   repositoryRIN :: Maybe RIN,
   repositoryChangeDate :: Maybe ChangeDate
@@ -139,30 +140,30 @@ data Source = Source {
   sourceUserReference :: [UserReference],
   sourceRIN :: Maybe RIN,
   sourceChangeDate :: Maybe ChangeDate,
-  sourceNote :: [Note],
-  sourceMultimedia :: [Multimedia]
+  sourceNote :: [GDRef Note],
+  sourceMultimedia :: [GDRef Multimedia]
 } deriving Show
 
 data Submission = Submission {
-  submissionSubmitter :: Maybe Submitter,
+  submissionSubmitter :: Maybe (GDRef Submitter),
   submissionFamilyFile :: Maybe T.Text,
   submissionTempleCode :: Maybe T.Text,
   submissionAncestorGenerations :: Maybe Word,
   submissionDescendentGenerations :: Maybe Word,
   submissionOrdinanceProcessing :: Maybe Bool,
   submissionRIN :: Maybe RIN,
-  submissionNote :: [Note],
+  submissionNote :: [GDRef Note],
   submissionChangeDate :: Maybe ChangeDate
 } deriving Show
 
 data Submitter = Submitter {
   submitterName :: T.Text,
   submitterAddress :: Maybe Address,
-  submitterMedia :: Maybe Multimedia,
+  submitterMedia :: Maybe (GDRef Multimedia),
   submitterLang :: [Language],
   submitterRFN :: Maybe RFN,
   submitterRIN :: Maybe RIN,
-  submitterNote :: [Note],
+  submitterNote :: [GDRef Note],
   submitterChangeDate :: Maybe ChangeDate
 } deriving Show
 
@@ -170,7 +171,7 @@ data Submitter = Submitter {
 data SourceData = SourceData {
   sourceDataEventsRecorded :: [SourceRecordedEvent],
   sourceDataAgency :: Maybe T.Text,
-  sourceDataNote :: [Note]
+  sourceDataNote :: [GDRef Note]
 } deriving Show
 
 data SourceRecordedEvent = SourceRecordedEvent {
@@ -180,22 +181,22 @@ data SourceRecordedEvent = SourceRecordedEvent {
 } deriving Show
 
 data Association = Association {
-  associationIndividual :: Individual,
+  associationIndividual :: GDRef Individual,
   associationRelation :: T.Text,
   associationCitation :: [SourceCitation],
-  associationNote :: [Note]
+  associationNote :: [GDRef Note]
 } deriving Show
 
 data ChildToFamilyLink = ChildToFamilyLink {
-  childLinkFamily :: Family,
+  childLinkFamily :: GDRef Family,
   childLinkPedigree :: Maybe Pedigree,
   childLinkStatus :: Maybe ChildLinkStatus,
-  childLinkNote :: [Note]
+  childLinkNote :: [GDRef Note]
 } deriving Show
 
 data SpouseToFamilyLink = SpouseToFamilyLink {
-  spouseToFamilyLinkFamily :: Family,
-  spouseToFamilyLinkNote :: [Note]
+  spouseToFamilyLinkFamily :: GDRef Family,
+  spouseToFamilyLinkNote :: [GDRef Note]
 } deriving Show
 
 data EventDetail = EventDetail {
@@ -207,9 +208,9 @@ data EventDetail = EventDetail {
   eventDetailReligion :: Maybe T.Text,
   eventDetailCause :: Maybe T.Text,
   eventDetailRestrictionNotice :: Maybe RestrictionNotice,
-  eventDetailNote :: [Note],
+  eventDetailNote :: [GDRef Note],
   eventDetailSourceCitation :: [SourceCitation],
-  eventDetailMultimedia :: [Multimedia]
+  eventDetailMultimedia :: [GDRef Multimedia]
 } deriving Show
 
 data FamilyEventDetail = FamilyEventDetail {
@@ -239,7 +240,7 @@ data Place = Place {
   placePhonetic :: Maybe PhoneticPlaceName,
   placeRoman :: Maybe RomanPlaceName,
   placeMap :: Maybe MapCoord,
-  placeNote :: [Note]
+  placeNote :: [GDRef Note]
 } deriving Show
 
 data PersonalName = PersonalName {
@@ -269,12 +270,12 @@ data PersonalNamePieces = PersonalNamePieces {
   namePieceSurnamePrefix :: [T.Text],
   namePieceSurname :: [T.Text],
   namePieceSuffix :: [T.Text],
-  namePieceNameNote :: [Note],
+  namePieceNameNote :: [GDRef Note],
   namePirceSourceCitation :: [SourceCitation]
 } deriving Show
 
 data IndividualAttribute = IndividualAttribute
-    IndividualAttributeType IndividualEventDetail
+    IndividualAttributeType (IndividualEventDetail)
   deriving Show
 
 data IndividualAttributeType =
@@ -294,16 +295,16 @@ data IndividualAttributeType =
   | Fact T.Text deriving Show
 
 data SourceCitation = SourceCitation {
-  citeSource :: Either SourceDescription Source,
+  citeSource :: Either SourceDescription (GDRef Source),
   citePage :: Maybe T.Text,
-  citeMultimedia :: [Multimedia],
-  citeNote :: [Note],
+  citeMultimedia :: [GDRef Multimedia],
+  citeNote :: [GDRef Note],
   citeQuality :: Maybe QualityAssessment
 } deriving Show
 
 data RepositoryCitation = RepositoryCitation {
-  repoCiteRepository :: Maybe Repository,
-  repoCiteNote :: [Note],
+  repoCiteRepository :: Maybe (GDRef Repository),
+  repoCiteNote :: [GDRef Note],
   repoCiteCallNumber :: Maybe CallNumber
 } deriving Show
 
@@ -368,8 +369,10 @@ data FamilyEventType =
   deriving Show
 
 data IndividualEventType =
-    Birth (Maybe Family) | Christening (Maybe Family) | Death | Burial
-  | Cremation | Adoption (Maybe AdoptionDetail) | Baptism | BarMitzvah
+    Birth (Maybe (GDRef Family)) | Christening (Maybe (GDRef Family))
+  | Death | Burial
+  | Cremation | Adoption (Maybe AdoptionDetail)
+  | Baptism | BarMitzvah
   | BasMitzvah | Blessing | ChristeningAdult | Confirmation | FirstCommunion
   | Ordination | Naturalization | Emigration | Immigration | IndvCensus
   | Probate | Will | Graduation | Retirement | IndividualEventType T.Text
@@ -382,10 +385,11 @@ data EventType =
   | EventType T.Text
   deriving Show
 
-data AdoptionDetail = AdoptionDetail Family (Maybe Parent) deriving Show
+data AdoptionDetail =
+  AdoptionDetail (GDRef Family) (Maybe Parent) deriving Show
 data Calendar = Gregorian | Julian | Hebrew | French deriving Show
 data CallNumber = CallNumber T.Text (Maybe MultimediaType) deriving Show
-data ChangeDate = ChangeDate UTCTime (Maybe Note) deriving Show
+data ChangeDate = ChangeDate UTCTime (Maybe (GDRef Note)) deriving Show
 data Charset = Charset T.Text (Maybe T.Text) deriving Show
 data ChildLinkStatus = Challenged | Disproved | Proven deriving Show
 data Date = Date Calendar (Maybe Word) (Maybe Word) Year deriving Show

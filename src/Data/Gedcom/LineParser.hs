@@ -1,63 +1,15 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
-
 module Data.Gedcom.LineParser where
 
-import Control.Arrow
 import Control.Monad
 import Data.Char
+import Data.Gedcom.Common
 import Data.Gedcom.Internal.Common
-import Data.List
 import Data.Maybe
 import Data.Monoid
 import qualified Data.Text.All as T
 import Text.Megaparsec
-
-data GDRoot = GDRoot [GDTree] deriving Show
-data GDTree = GDTree GDLine [GDTree] deriving Show
-data GDLine = GDLine GDLevel (Maybe GDXRefID) GDTag (Maybe GDLineValue)
-  deriving Show
-data GDLineValue =
-  GDLineItemV GDLineItem | GDXRefIDV GDXRefID deriving (Show, Eq)
-newtype GDLineItem = GDLineItem [(Maybe GDEscape, T.Text)] deriving (Show, Eq)
-newtype GDEscape = GDEscape T.Text deriving (Show, Eq)
-newtype GDXRefID = GDXRefID T.Text deriving (Show, Eq, Ord)
-newtype GDTag = GDTag T.Text deriving (Show, Eq, Ord)
-newtype GDLevel = GDLevel Int deriving (Show, Eq, Ord, Num)
-
-gdLineData :: GDLineItem -> [(Maybe GDEscape, T.Text)]
-gdLineData (GDLineItem v) = v
-
-instance Monoid GDLineItem where
-  mempty = GDLineItem []
-  mappend (GDLineItem l1) (GDLineItem l2) =
-    GDLineItem . fmap coalease . groupBy canCoalease$ l1 <> l2
-    where
-      coalease [] = (Nothing, "") 
-      coalease (l:ls) = foldl' (\(_, t1) (e, t2) -> (e, t1 <> t2)) l ls
-      canCoalease (Nothing, _) (_, _) = True
-      canCoalease _ _ = False
-
-gdTrimLineItem :: GDLineItem -> GDLineItem
-gdTrimLineItem (GDLineItem []) = GDLineItem []
-gdTrimLineItem (GDLineItem ((e, t):rst)) =
-  let
-    rst' = reverse$ case reverse rst of
-      [] -> []
-      ((e', t'):rst'') -> (e', T.dropWhile isSpace t'):rst''
-  in GDLineItem$ (e, T.dropWhile isSpace t):rst'
-
-gdIgnoreEscapes :: [(Maybe GDEscape, T.Text)] -> T.Text
-gdIgnoreEscapes  = T.concat . fmap snd
-
-gdFilterEscapes ::
-  [GDEscape] -> [(Maybe GDEscape, T.Text)] -> [(Maybe GDEscape, T.Text)]
-gdFilterEscapes escapes =
-  gdLineData . mconcat . fmap GDLineItem . fmap (:[]) . fmap (first f)
-  where
-    f (Just e) = if e `elem` escapes then Just e else Nothing
-    f Nothing = Nothing
 
 gdAnyChar :: Parser String
 gdAnyChar = (fmap (:[]) gdNonAt) <|> string "@@"

@@ -16,9 +16,11 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   ghc-options:         -Wall
-  exposed-modules:     Lib, Data.Text.Encoding.ANSEL
-  other-modules:       Data.Gedcom.LineParser
+  exposed-modules:     Data.Gedcom, Data.Text.Encoding.ANSEL
+  other-modules:       Data.Gedcom.Common
                        , Data.Gedcom.Internal.Common
+                       , Data.Gedcom.LineParser
+                       , Data.Gedcom.ParseMonads
                        , Data.Gedcom.Parser
                        , Data.Gedcom.Structure
   build-depends:       base >= 4.7 && < 5
