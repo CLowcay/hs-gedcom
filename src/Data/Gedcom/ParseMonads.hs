@@ -14,7 +14,17 @@ This module contains monads and utility functions for extracting GEDCOM records
 from the raw syntax tree.
 
 -}
-module Data.Gedcom.ParseMonads where
+module Data.Gedcom.ParseMonads (
+  StructureParser,
+  MultiMonad,
+  runMultiMonad,
+  parseMulti,
+  parseOptional,
+  parseRequired,
+  StructureMonad,
+  addReference,
+  runStructure
+) where
 
 import Control.Monad
 import Control.Monad.Except
@@ -28,21 +38,28 @@ import Data.Monoid
 import qualified Data.Map as M
 import qualified Data.Text.All as T
 
-type StructureParser a = GDTree -> StructureMonad (Either GDTree a)
+-- | A parser that extracts a GEDCOM structure from a GEDCOM subtree.
+type StructureParser a =
+     GDTree                               -- ^ The  subtree to parse.
+  -> StructureMonad (Either GDTree a)     -- ^ Either parsed structure, or the subtree itself if the subtree doesn't contain the expected GEDCOM structure.
 
--- The MultiMonad
-
+-- | A Monad for parsing GEDCOM structures out of a list of GEDCOM subtrees.
 newtype MultiMonad a =
   MultiMonad (ExceptT GDError (StateT [GDTree] StructureMonad) a)
   deriving (Monad, Functor, Applicative, MonadError GDError)
 
-runMultiMonad :: [GDTree] -> MultiMonad a -> StructureMonad a
+-- | Run a 'MultiMonad' into a 'StructureMonad'.
+runMultiMonad ::
+     [GDTree]         -- ^ The subtrees to parse the structure from.
+  -> MultiMonad a     -- ^ The MultiMonad that does the parsing.
+  -> StructureMonad a
 runMultiMonad children (MultiMonad m) =
   ((flip evalStateT) children.runExceptT$ m) >>= rethrowError
   where rethrowError x = case x of
                            Left e -> throwError e
                            Right v -> return v
 
+-- | Parse multiple instances of a structure
 parseMulti :: StructureParser a -> MultiMonad [a]
 parseMulti p = MultiMonad$ do
   ls <- lift$ get
@@ -50,6 +67,7 @@ parseMulti p = MultiMonad$ do
   lift$ put others
   return vs
 
+-- | Parse an optional instance of a structure
 parseOptional :: StructureParser a -> MultiMonad (Maybe a)
 parseOptional p = MultiMonad$ do
   ls <- lift$ get
@@ -65,7 +83,11 @@ parseOptional p = MultiMonad$ do
     pick v rest Nothing = (Nothing, v:rest)
     pick _ rest x = (x, rest)
 
-parseRequired :: GDTag -> StructureParser a -> MultiMonad a
+-- | Parse a required instance of a structure
+parseRequired ::
+     GDTag       -- ^ The tag that identifies the required structure.
+  -> StructureParser a
+  -> MultiMonad a
 parseRequired tag p = do
   r <- parseOptional p
   case r of
@@ -73,13 +95,17 @@ parseRequired tag p = do
     Nothing -> throwError.TagError$
       "Could not find required " <> (T.show tag) <> " tag"
 
--- The StructureMonad
-
+-- | A monad for parsing an instance of a GEDCOM structure from a GEDCOM
+-- subtree.
 newtype StructureMonad a =
   StructureMonad (ExceptT GDError (State (M.Map GDXRefID Dynamic)) a)
   deriving (Monad, Functor, Applicative, MonadError GDError)
 
-addReference :: Typeable a => GDXRefID -> a -> StructureMonad ()
+-- | Add a reference to the cross reference table.
+addReference :: Typeable a
+  => GDXRefID            -- ^ The cross reference to add.
+  -> a                   -- ^ The value the reference will resolve to.
+  -> StructureMonad ()
 addReference thisID value = StructureMonad$ do
   alreadySeen <- M.member thisID <$> lift get
   when alreadySeen$
@@ -87,6 +113,8 @@ addReference thisID value = StructureMonad$ do
   lift.modify$ M.insert thisID (toDyn value)
   return ()
 
+-- | Run a 'StructureMonad', returning either an error or a value, and the
+-- cross reference table.
 runStructure :: StructureMonad a -> (Either GDError a, M.Map GDXRefID Dynamic)
 runStructure (StructureMonad m) = (flip runState) M.empty . runExceptT$ m
 
