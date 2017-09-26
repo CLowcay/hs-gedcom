@@ -413,7 +413,7 @@ parseIndividualEvent = do
         <$> (mkType <$> parseOptional parseFamilyRef)
         <*> parseIndividualEventDetail
     parseFamilyRef = parseLinkTag (GDTag "FAMC") 
-    parseAdopFamilyRef = parseTagFull (GDTag "FAMC")$ \(lb, children) ->
+    parseAdopFamilyRef = parseTagFull (GDTag "FAMC") nullrref$ \(lb, children) ->
       case lb of
         Right _ -> throwError.RequiredRef$ "Missing link in FAMC"
         Left f -> runMultiMonad children$
@@ -431,7 +431,7 @@ parseIndividualEventDetail = IndividualEventDetail
   <*> parseOptional (parseWordTag (GDTag "AGE"))
 
 parseChildToFamilyLink :: StructureParser ChildToFamilyLink
-parseChildToFamilyLink = parseTagFull (GDTag "FAMC")$ \(lb, children) ->
+parseChildToFamilyLink = parseTagFull (GDTag "FAMC") nullrref$ \(lb, children) ->
   case lb of
     Right _ -> throwError.RequiredRef$ "Missing link in FAMC"
     Left f -> runMultiMonad children$ ChildToFamilyLink f
@@ -457,14 +457,15 @@ parseChildLinkStatus = parseNoLinkTag (GDTag "STAT")$ \(t, _) ->
     _ -> throwError.FormatError$ "Invalid child link status " <> (T.show t)
 
 parseSpouseToFamilyLink :: StructureParser SpouseToFamilyLink
-parseSpouseToFamilyLink = parseTagFull (GDTag "FAMS")$ \(lb, children) ->
-  case lb of
-    Right _ -> throwError.RequiredRef$ "Missing link in FAMS"
-    Left f -> runMultiMonad children$ SpouseToFamilyLink f
-      <$> parseMulti parseNote
+parseSpouseToFamilyLink = parseTagFull (GDTag "FAMS") nullrref$
+  \(lb, children) ->
+    case lb of
+      Right _ -> throwError.RequiredRef$ "Missing link in FAMS"
+      Left f -> runMultiMonad children$ SpouseToFamilyLink f
+        <$> parseMulti parseNote
 
 parseAssociation :: StructureParser Association
-parseAssociation = parseTagFull (GDTag "ASSO")$ \(lb, children) ->
+parseAssociation = parseTagFull (GDTag "ASSO") nullrref$ \(lb, children) ->
   case lb of
     Right _ -> throwError.RequiredRef$ "Missing link in ASSO"
     Left i -> runMultiMonad children$ Association i
@@ -488,13 +489,14 @@ parseSourceRecordedEvent = parseNoLinkTag (GDTag "EVEN")$
             "Badly formatted date period: " <> (T.show date)
 
 parseRepositoryCitation :: StructureParser RepositoryCitation
-parseRepositoryCitation = parseTagFull (GDTag "REPO")$ \(lb, children) ->
-  let repo = case lb of
-               Left v -> Just v
-               Right _ -> Nothing
-  in runMultiMonad children$ RepositoryCitation repo
-    <$> parseMulti parseNote
-    <*> parseOptional parseCallNumber
+parseRepositoryCitation = parseTagFull (GDTag "REPO") nullrref$
+  \(lb, children) ->
+    let repo = case lb of
+                 Left v -> Just v
+                 Right _ -> Nothing
+    in runMultiMonad children$ RepositoryCitation repo
+      <$> parseMulti parseNote
+      <*> parseOptional parseCallNumber
 
 parseCallNumber :: StructureParser CallNumber
 parseCallNumber = parseNoLinkTag (GDTag "CALN")$ \(n, children) ->
@@ -502,22 +504,23 @@ parseCallNumber = parseNoLinkTag (GDTag "CALN")$ \(n, children) ->
     <$> parseOptional (parseMultimediaType (GDTag "MEDI"))
 
 parseSourceCitation :: StructureParser SourceCitation
-parseSourceCitation = parseTagFull (GDTag "SOUR")$ \(lb, children) ->
-  case lb of
-    Left source ->
-      runMultiMonad children$ SourceCitation (Right source)
-        <$> parseOptional (parseTextTag (GDTag "PAGE"))
-        <*> parseMulti parseMultimedia
-        <*> parseMulti parseNote
-        <*> parseOptional parseQuality
-    Right description ->
-      runMultiMonad children$ SourceCitation
-        <$> (Left . SourceDescription (gdIgnoreEscapes description)
-          <$> parseMulti (parseTextTag (GDTag "TEXT")))
-        <*> pure Nothing
-        <*> parseMulti parseMultimedia
-        <*> parseMulti parseNote
-        <*> parseOptional parseQuality
+parseSourceCitation = parseTagFull (GDTag "SOUR") nullrref$
+  \(lb, children) ->
+    case lb of
+      Left source ->
+        runMultiMonad children$ SourceCitation (Right source)
+          <$> parseOptional (parseTextTag (GDTag "PAGE"))
+          <*> parseMulti parseMultimedia
+          <*> parseMulti parseNote
+          <*> parseOptional parseQuality
+      Right description ->
+        runMultiMonad children$ SourceCitation
+          <$> (Left . SourceDescription (gdIgnoreEscapes description)
+            <$> parseMulti (parseTextTag (GDTag "TEXT")))
+          <*> pure Nothing
+          <*> parseMulti parseMultimedia
+          <*> parseMulti parseNote
+          <*> parseOptional parseQuality
 
 parseGedcomFormat :: StructureParser GedcomFormat
 parseGedcomFormat = parseNoLinkTag (GDTag "GEDC")$ \(_, children) ->
@@ -938,28 +941,42 @@ type TagHandler b a =
   (Either (GDRef b) [(Maybe GDEscape, T.Text)], [GDTree])
   -> StructureMonad a
 
+type RegisterRef a = GDTag -> GDXRefID -> a -> StructureMonad ()
+
+nullrref :: Typeable a => RegisterRef a
+nullrref _ _ _ = return ()
+
+defrref :: Typeable a => RegisterRef (GDRef a)
+defrref _ thisID (GDStructure a) = addReference thisID a
+defrref tag _ _ = throwError.UnexpectedRef$
+  "Referenced structure references another structure " <> (T.show tag)
+
 parseTag :: Typeable a => GDTag -> NoLinkHandler a -> StructureParser (GDRef a)
-parseTag tag handler = parseTagFull tag$ \(lb, children) ->
+parseTag tag handler = parseTagFull tag defrref$ \(lb, children) ->
   case lb of
     Left ref -> return ref
     Right text -> GDStructure <$> handler (text, children)
 
 parseNoLinkTag :: Typeable a => GDTag -> NoLinkHandler a -> StructureParser a
-parseNoLinkTag tag handler = parseTagFull tag$ \(lb, children) ->
+parseNoLinkTag tag handler = parseTagFull tag nullrref$ \(lb, children) ->
   case lb of
     Left _ -> throwError.UnexpectedRef$
       "Cannot follow cross references on " <> (T.show tag)
     Right text -> handler (text, children)
 
 parseLinkTag :: Typeable a => GDTag -> StructureParser (GDRef a)
-parseLinkTag tag = parseTagFull tag$ \(lb, _) ->
+parseLinkTag tag = parseTagFull tag nullrref$ \(lb, _) ->
   case lb of
     Left ref -> return ref
     Right _ -> throwError.RequiredRef$
       "Expected cross reference was missing in " <> (T.show tag)
 
-parseTagFull :: Typeable a => GDTag -> TagHandler b a -> StructureParser a
-parseTagFull tag handler t@(GDTree (GDLine _ mthisID tag' v) children) =
+parseTagFull :: Typeable a
+  => GDTag
+  -> RegisterRef a
+  -> TagHandler b a
+  -> StructureParser a
+parseTagFull tag rref handler t@(GDTree (GDLine _ mthisID tag' v) children) =
   if tag /= tag' then return$ Left t else do
     r <- case v of
       Nothing -> Right <$> (handler.(first Right)$ parseCont mempty children)
@@ -967,9 +984,9 @@ parseTagFull tag handler t@(GDTree (GDLine _ mthisID tag' v) children) =
         Right <$> (handler (Left (GDXRef xref), children))
       Just (GDLineItemV l1) ->
         Right <$> (handler.(first Right)$ parseCont l1 children)
-    case mthisID of
-      Nothing -> return ()
-      Just thisID -> addReference thisID r
+    case (mthisID, r) of
+      (Just thisID, Right rv) -> rref tag thisID rv
+      _ -> return ()
     return r
 
 parseCont :: GDLineItem -> [GDTree] -> ([(Maybe GDEscape, T.Text)], [GDTree])
