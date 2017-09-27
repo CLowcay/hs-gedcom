@@ -1,8 +1,10 @@
 name:                gedcom
 version:             0.1.0.0
--- synopsis:
--- description:
-homepage:            https://github.com/githubuser/gedcom#readme
+synopsis:            Parser for the GEDCOM genealogy file format.
+description:         A parser for the legacy GEDCOM 5.5 file format. GEDCOM is
+                     widely used by genealogy software, despite the limitations
+                     of the format.
+homepage:            https://github.com/CLowcay/hs-gedcom
 license:             BSD3
 license-file:        LICENSE
 author:              Callum Lowcay
@@ -10,7 +12,7 @@ maintainer:          cwslowcay@gmail.com
 copyright:           2017 Callum Lowcay
 category:            Genealogy
 build-type:          Simple
-extra-source-files:  README.md
+extra-source-files:  README.md changelog.md
 cabal-version:       >=1.10
 
 library
@@ -46,4 +48,5 @@ test-suite gedcom-test
 
 source-repository head
   type:     git
-  location: https://github.com/githubuser/gedcom
+  location: https://github.com/CLowcay/hs-gedcom
+

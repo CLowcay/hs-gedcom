@@ -3,7 +3,7 @@
 
 {-|
 Module: Data.Gedcom
-Description: Parser for the GEDCOM genealogy  format
+Description: Parser for the GEDCOM genealogy format
 Copyright: (c) Callum Lowcay, 2017
 License: BSD3
 Maintainer: cwslowcay@gmail.com
