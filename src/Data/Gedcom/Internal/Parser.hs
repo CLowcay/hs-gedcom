@@ -19,7 +19,10 @@ module Data.Gedcom.Internal.Parser (
   parseGedcom,
   parseHeader,
 
-  -- For testing
+  parseBoolTag,
+  parseWordTag,
+  parseTextTag,
+  parseListTag,
   parseNoLinkTag
 ) where
 
@@ -1032,7 +1035,10 @@ parseTextTag tag = parseNoLinkTag tag (return.gdIgnoreEscapes.fst)
 -- | Extract a list of comma separated values from a tag.
 parseListTag :: GDTag -> StructureParser [T.Text]
 parseListTag tag =
-  parseNoLinkTag tag (return . T.splitOn "," . gdIgnoreEscapes . fst)
+  parseNoLinkTag tag (return . split . trim . gdIgnoreEscapes . fst)
+  where
+    split "" = []
+    split s = T.splitOn "," s
 
 -- | Handler for tags that cannot contain cross references.
 type NoLinkHandler a =
