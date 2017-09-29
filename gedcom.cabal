@@ -1,5 +1,5 @@
 name:                gedcom
-version:             0.1.0.1
+version:             0.2.0.0
 synopsis:            Parser for the GEDCOM genealogy file format.
 description:         A parser for the legacy GEDCOM 5.5 file format. GEDCOM is
                      widely used by genealogy software, despite the limitations
