@@ -13,14 +13,14 @@ Portability: GHC
 This module parses a Text string into a GEDCOM syntax tree.
 
 -}
-module Data.Gedcom.LineParser (
+module Data.Gedcom.Internal.LineParser (
   gdRoot, gdDelim
 ) where
 
 import Control.Monad
 import Data.Char
-import Data.Gedcom.Common
 import Data.Gedcom.Internal.Common
+import Data.Gedcom.Internal.CoreTypes
 import Data.Maybe
 import Data.Monoid
 import qualified Data.Text.All as T

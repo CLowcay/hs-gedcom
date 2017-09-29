@@ -15,19 +15,22 @@ Portability: GHC
 These parsers extract the GEDCOM records from the raw syntax tree.
 
 -}
-module Data.Gedcom.Parser (
+module Data.Gedcom.Internal.Parser (
   parseGedcom,
-  parseHeader
+  parseHeader,
+
+  -- For testing
+  parseNoLinkTag
 ) where
 
 import Control.Applicative
 import Control.Monad.Except
 import Data.Bifunctor
 import Data.Dynamic
-import Data.Gedcom.Common
 import Data.Gedcom.Internal.Common
-import Data.Gedcom.LineParser
-import Data.Gedcom.ParseMonads
+import Data.Gedcom.Internal.CoreTypes
+import Data.Gedcom.Internal.LineParser
+import Data.Gedcom.Internal.ParseMonads
 import Data.Gedcom.Structure
 import Data.Maybe
 import Data.Monoid

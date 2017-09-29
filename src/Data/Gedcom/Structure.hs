@@ -96,7 +96,7 @@ RIN (..),
 Year (..)
 ) where
 
-import Data.Gedcom.Common
+import Data.Gedcom.Internal.CoreTypes
 import Data.Time.Clock
 import qualified Data.Text.All as T
 

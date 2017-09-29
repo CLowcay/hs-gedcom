@@ -24,14 +24,15 @@ module Data.Gedcom (
 import Control.Applicative
 import Data.Dynamic
 import Data.Either
-import Data.Gedcom.Common
-import Data.Gedcom.LineParser
-import Data.Gedcom.ParseMonads
-import Data.Gedcom.Parser
+import Data.Gedcom.Internal.CoreTypes
+import Data.Gedcom.Internal.LineParser
+import Data.Gedcom.Internal.ParseMonads
+import Data.Gedcom.Internal.Parser
 import Data.Gedcom.Structure
 import Data.Maybe
 import Data.Monoid
 import Data.Text.Encoding.ANSEL
+import Data.Typeable
 import qualified Data.ByteString as B
 import qualified Data.Map as M
 import qualified Data.Text.All as T

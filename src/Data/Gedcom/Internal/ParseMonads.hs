@@ -14,7 +14,7 @@ This module contains monads and utility functions for extracting GEDCOM records
 from the raw syntax tree.
 
 -}
-module Data.Gedcom.ParseMonads (
+module Data.Gedcom.Internal.ParseMonads (
   StructureParser,
   MultiMonad,
   runMultiMonad,
@@ -32,7 +32,7 @@ import Control.Monad.State
 import Data.Dynamic
 import Data.Either
 import Data.Foldable
-import Data.Gedcom.Common
+import Data.Gedcom.Internal.CoreTypes
 import Data.Maybe
 import Data.Monoid
 import qualified Data.Map as M

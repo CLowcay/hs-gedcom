@@ -10,7 +10,7 @@ Maintainer: cwslowcay@gmail.com
 Stability: experimental
 Portability: GHC
 -}
-module Data.Gedcom.Common (
+module Data.Gedcom.Internal.CoreTypes (
   GDRefError (..),
   GDError (..),
   GDRef (..),
@@ -64,14 +64,14 @@ data GDRef a =
   deriving Show
 
 -- | A raw GEDCOM syntax tree
-data GDRoot = GDRoot [GDTree] deriving Show
+data GDRoot = GDRoot [GDTree] deriving (Show, Eq)
 
 -- | A GEDCOM subtree
-data GDTree = GDTree GDLine [GDTree] deriving Show
+data GDTree = GDTree GDLine [GDTree] deriving (Show, Eq)
 
 -- | A GEDCOM line
 data GDLine = GDLine GDLevel (Maybe GDXRefID) GDTag (Maybe GDLineValue)
-  deriving Show
+  deriving (Show, Eq)
 
 -- | The value field
 data GDLineValue =
