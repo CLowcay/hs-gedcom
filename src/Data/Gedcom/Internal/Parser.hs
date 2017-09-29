@@ -23,6 +23,8 @@ module Data.Gedcom.Internal.Parser (
   parseWordTag,
   parseTextTag,
   parseListTag,
+  parseTag,
+  parseLinkTag,
   parseNoLinkTag
 ) where
 

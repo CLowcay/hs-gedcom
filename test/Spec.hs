@@ -5,6 +5,7 @@ import Data.Gedcom.Internal.LineParser
 import Data.Gedcom.Internal.ParseMonads
 import Data.Gedcom.Internal.Parser
 import Data.Monoid
+import Data.Void
 import qualified Data.Text.All as T
 import Test.Hspec
 import Text.Megaparsec
@@ -28,6 +29,11 @@ ref1 = GDXRefID "1"
 linkTag :: Maybe GDLine
 linkTag = do
   (GDRoot [GDTree t []]) <- parseMaybe gdRoot$ "0 TEST @1@\n"
+  return t
+
+linkLinkTag :: Maybe GDLine
+linkLinkTag = do
+  (GDRoot [GDTree t []]) <- parseMaybe gdRoot$ "0 @2@ TEST @1@\n"
   return t
 
 crdTag :: Maybe GDLine
@@ -82,6 +88,30 @@ main = hspec$ do
         `shouldBe` NoMatch
     it "doesn't parse links"$
       isError$ testLine linkTag (parseNoLinkTag (GDTag "TEST") pure)
+
+  describe "parseTag"$ do
+    it "matches the specified tag"$
+      testLine (testTag testTagData) (parseTag (GDTag "TEST") pure)
+        `shouldBe` (Match . GDStructure$ (noEscapes testTagData, []))
+    it "matches the specified tag (with a cross reference)" $
+      testLine crdTag (parseTag (GDTag "TEST") pure)
+        `shouldBe` (Match . GDStructure$ (noEscapes testTagData, []))
+    it "doesn't match other tags"$
+      testLine (testTag testTagData) (parseTag (GDTag "OTHER") pure)
+        `shouldBe` NoMatch
+    it "parses links"$
+      testLine linkTag (parseTag (GDTag "TEST") pure)
+        `shouldBe` (Match$ GDXRef ref1)
+    it "doesn't parse links to links"$
+      isError$ testLine linkLinkTag (parseTag (GDTag "TEST") pure)
+
+  describe "parseLinkTag"$ do
+    it "parses link tags"$
+      testLine linkTag (parseLinkTag (GDTag "TEST")) `shouldBe`
+        (Match$ (GDXRef ref1 :: GDRef Void))
+    it "doesn't parse other tags"$
+      isError$ testLine (testTag testTagData)
+        (parseLinkTag (GDTag "TEST") :: StructureParser (GDRef Void))
 
   describe "parseTextTag"$ do
     it "matches the specified tag" $

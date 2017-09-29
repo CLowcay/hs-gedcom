@@ -61,7 +61,7 @@ data GDError =
 data GDRef a =
     GDStructure a          -- ^ Already dereferenced.
   | GDXRef GDXRefID        -- ^ The 'GDXRefID' to look up
-  deriving Show
+  deriving (Show, Eq)
 
 -- | A raw GEDCOM syntax tree
 data GDRoot = GDRoot [GDTree] deriving (Show, Eq)
