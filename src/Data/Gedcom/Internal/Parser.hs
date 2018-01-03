@@ -44,6 +44,7 @@ import Data.Time.Clock
 import qualified Data.Map.Lazy as M
 import qualified Data.Text.All as T
 import Text.Megaparsec
+import Text.Megaparsec.Char
 
 -- | Parse a 'Gedcom' value from the raw GEDCOM syntax tree.
 parseGedcom :: GDRoot -> (Either GDError Gedcom, M.Map GDXRefID Dynamic)
@@ -213,9 +214,9 @@ parseRestrictionNotice = parseNoLinkTag (GDTag "RESN")$ \(t, _) ->
       "Bad restriction notice " <> (T.show t)
     Just r -> return r
   where parser :: Parser RestrictionNotice
-        parser =     (Confidential <$ string' "confidential")
-                 <|> (Locked <$ string' "locked")
-                 <|> (Privacy <$ string' "privacy")
+        parser =     (Confidential <$ "confidential")
+                 <|> (Locked <$ "locked")
+                 <|> (Privacy <$ "privacy")
 
 -- | Parse a list of 'FamilyEvent's.
 parseFamilyEvent :: MultiMonad [FamilyEvent]
@@ -365,11 +366,11 @@ parseNameType = parseNoLinkTag (GDTag "TYPE")$ \(t', _) ->
   let t = gdIgnoreEscapes t'
   in return . fromMaybe (NameType t) . parseMaybe parser $ t
   where parser :: Parser NameType
-        parser =     (AKA <$ string' "aka")
-                 <|> (BirthName <$ string' "birth")
-                 <|> (Immigrant <$ string' "immigrant")
-                 <|> (Maiden <$ string' "maiden")
-                 <|> (Married <$ string' "married")
+        parser =     (AKA <$ "aka")
+                 <|> (BirthName <$ "birth")
+                 <|> (Immigrant <$ "immigrant")
+                 <|> (Maiden <$ "maiden")
+                 <|> (Married <$ "married")
 
 -- | Parse a 'PersonalNamePieces' structure.
 parseNamePieces :: MultiMonad PersonalNamePieces
@@ -779,7 +780,7 @@ getDate calendar = parseMaybe parser
       Gregorian -> yearGreg
       _ -> read <$> count' 1 4 digitChar
     parseYear = (\y bc -> Year$ if bc then (0 - y) else y)
-      <$> yearParser <*> ((True <$ string' "B.C.") <|> pure False)
+      <$> yearParser <*> ((True <$ "B.C.") <|> pure False)
     parser :: Parser Date
     parser =
       (try$ Date calendar
@@ -868,13 +869,13 @@ parseMultimediaFormat tag = parseNoLinkTag (GDTag "FORM")$ \(v', children) ->
 
   where
     parser :: Parser MultimediaFileFormat
-    parser =     (MF_BMP <$ string' "bmp")
-             <|> (MF_GIF <$ string' "gif")
-             <|> (MF_JPG <$ string' "jpg")
-             <|> (MF_OLE <$ string' "ole")
-             <|> (MF_PCX <$ string' "pcx")
-             <|> (MF_TIF <$ string' "tif")
-             <|> (MF_WAV <$ string' "wav")
+    parser =     (MF_BMP <$ "bmp")
+             <|> (MF_GIF <$ "gif")
+             <|> (MF_JPG <$ "jpg")
+             <|> (MF_OLE <$ "ole")
+             <|> (MF_PCX <$ "pcx")
+             <|> (MF_TIF <$ "tif")
+             <|> (MF_WAV <$ "wav")
 
 -- | Parse a 'MultimediaType'.
 parseMultimediaType :: GDTag -> StructureParser MultimediaType
@@ -883,71 +884,71 @@ parseMultimediaType tag = parseNoLinkTag tag$ \(v', _) ->
   in return.fromMaybe (MT_OTHER v)$ parseMaybe parser v
   where
     parser :: Parser MultimediaType
-    parser =     (MT_AUDIO <$ string' "audio")
-             <|> (MT_BOOK <$ string' "book")
-             <|> (MT_CARD <$ string' "card")
-             <|> (MT_ELECTRONIC <$ string' "electronic")
-             <|> (MT_FICHE <$ string' "fiche")
-             <|> (MT_FILM <$ string' "film")
-             <|> (MT_MAGAZINE <$ string' "magazine")
-             <|> (MT_MANUSCRIPT <$ string' "manuscript")
-             <|> (MT_MAP <$ string' "map")
-             <|> (MT_NEWSPAPER <$ string' "newspaper")
-             <|> (MT_PHOTO <$ string' "photo")
-             <|> (MT_TOMBSTONE <$ string' "tombstone")
-             <|> (MT_VIDEO <$ string' "video")
+    parser =     (MT_AUDIO <$ "audio")
+             <|> (MT_BOOK <$ "book")
+             <|> (MT_CARD <$ "card")
+             <|> (MT_ELECTRONIC <$ "electronic")
+             <|> (MT_FICHE <$ "fiche")
+             <|> (MT_FILM <$ "film")
+             <|> (MT_MAGAZINE <$ "magazine")
+             <|> (MT_MANUSCRIPT <$ "manuscript")
+             <|> (MT_MAP <$ "map")
+             <|> (MT_NEWSPAPER <$ "newspaper")
+             <|> (MT_PHOTO <$ "photo")
+             <|> (MT_TOMBSTONE <$ "tombstone")
+             <|> (MT_VIDEO <$ "video")
 
 -- | Parse a 'FamilyEventType'.
 getFamilyEventType :: T.Text -> Maybe FamilyEventType
 getFamilyEventType = parseMaybe parser
   where
     parser :: Parser FamilyEventType
-    parser =     (Annuled <$ string' "ANUL")
-             <|> (FamCensus <$ string' "CENS")
-             <|> (Divorce <$ string' "DIV")
-             <|> (DivorceFiled <$ string' "DIVF")
-             <|> (Engagement <$ string' "ENGA")
-             <|> (MarriageBann <$ string' "MARB")
-             <|> (MarriageContract <$ string' "MARC")
-             <|> (Marriage <$ string' "MARR")
-             <|> (MarriageLicense <$ string' "MARL")
-             <|> (MarriageSettlement <$ string' "MARS")
-             <|> (Residence <$ string' "RESI")
+    parser =     (Annuled <$ "ANUL")
+             <|> (FamCensus <$ "CENS")
+             <|> (Divorce <$ "DIV")
+             <|> (DivorceFiled <$ "DIVF")
+             <|> (Engagement <$ "ENGA")
+             <|> (MarriageBann <$ "MARB")
+             <|> (MarriageContract <$ "MARC")
+             <|> (Marriage <$ "MARR")
+             <|> (MarriageLicense <$ "MARL")
+             <|> (MarriageSettlement <$ "MARS")
+             <|> (Residence <$ "RESI")
              <|> (FamilyEventType . T.pack <$>
-               (string' "EVEN" *> gdDelim *> many anyChar))
+               ("EVEN" *> gdDelim *> many anyChar))
 
 -- | Parse an 'IndividualEventType'.
 getIndividualEventType :: T.Text -> Maybe IndividualEventType
 getIndividualEventType = parseMaybe parser
   where
     parser :: Parser IndividualEventType
-    parser =     (Birth Nothing <$ (string' "BIRTH"
-                    *> optional (gdDelim >> string' "Y")))
-             <|> (Christening Nothing <$ (string' "CHR"
-                    *> optional (gdDelim >> string' "Y")))
-             <|> (Death <$ (string' "DEAT"
-                    *> optional (gdDelim >> string' "Y")))
-             <|> (Burial <$ string' "BURI")
-             <|> (Cremation <$ string' "CREM")
-             <|> (Adoption Nothing <$ string' "ADOP")
-             <|> (Baptism <$ string' "BAPM")
-             <|> (BarMitzvah <$ string' "BARM")
-             <|> (BasMitzvah <$ string' "BASM")
-             <|> (Blessing <$ string' "BLES")
-             <|> (ChristeningAdult <$ string' "CHRA")
-             <|> (Confirmation <$ string' "CONF")
-             <|> (FirstCommunion <$ string' "FCOM")
-             <|> (Ordination <$ string' "ORDN")
-             <|> (Naturalization <$ string' "NATU")
-             <|> (Emigration <$ string' "EMIG")
-             <|> (Immigration <$ string' "IMMI")
-             <|> (IndvCensus <$ string' "CENS")
-             <|> (Probate <$ string' "PROB")
-             <|> (Will <$ string' "WILL")
-             <|> (Graduation <$ string' "GRAD")
-             <|> (Retirement <$ string' "RETI")
+    parser =     (Birth Nothing <$ ("BIRTH"
+                    *> optional (gdDelim >> "Y")))
+             <|> (Christening Nothing <$ ("CHR"
+                    *> optional (gdDelim >> "Y")))
+             <|> (Death <$ ("DEAT"
+                    *> optional (gdDelim >> "Y")))
+             <|> (Burial <$ "BURI")
+             <|> (Cremation <$ "CREM")
+             <|> (Adoption Nothing <$ "ADOP")
+             <|> (Baptism <$ "BAPM")
+             <|> (BarMitzvah <$ "BARM")
+             <|> (BasMitzvah <$ "BASM")
+             <|> (Blessing <$ "BLES")
+             <|> (ChristeningAdult <$ "CHRA")
+             <|> (Confirmation <$ "CONF")
+             <|> (FirstCommunion <$ "FCOM")
+             <|> (Ordination <$ "ORDN")
+             <|> (Naturalization <$ "NATU")
+             <|> (Emigration <$ "EMIG")
+             <|> (Immigration <$ "IMMI")
+             <|> (IndvCensus <$ "CENS")
+             <|> (Probate <$ "PROB")
+             <|> (Will <$ "WILL")
+             <|> (Graduation <$ "GRAD")
+             <|> (Retirement <$ "RETI")
              <|> (IndividualEventType . T.pack <$>
-               (string' "EVEN" *> gdDelim *> many anyChar))
+               ("EVEN" *> gdDelim *> many anyChar))
 
 -- | Parse an 'EventType'.
 getEventType :: T.Text -> Maybe EventType
@@ -1018,7 +1019,7 @@ parseBoolTag tag = parseNoLinkTag tag$ \(v, _) ->
     Just yn -> return yn
   where
     ynParser :: Parser Bool
-    ynParser = (True <$ string' "yes") <|> (False <$ string' "no")
+    ynParser = (True <$ "yes") <|> (False <$ "no")
 
 -- | Parse a Word value.
 parseWordTag :: GDTag -> StructureParser Word

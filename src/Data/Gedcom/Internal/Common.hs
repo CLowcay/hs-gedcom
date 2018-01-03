@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 {-|
 Module: Data.Gedcom.Internal.Common
 Description: Common utility functions for parsing
@@ -17,11 +19,13 @@ import Control.Applicative
 import Data.Char
 import Data.Maybe
 import Data.Time.Clock
+import Data.Void
 import qualified Data.Text.All as T
 import Text.Megaparsec
+import Text.Megaparsec.Char
 
 -- | Parsers from 'T.Text' using the default error component.
-type Parser = Parsec Dec T.Text
+type Parser = Parsec Void T.Text
 
 infixl 1 <&>
 

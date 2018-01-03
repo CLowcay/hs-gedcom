@@ -25,10 +25,11 @@ import Data.Maybe
 import Data.Monoid
 import qualified Data.Text.All as T
 import Text.Megaparsec
+import Text.Megaparsec.Char
 
 -- | Parse any_char.
-gdAnyChar :: Parser String
-gdAnyChar = (fmap (:[]) gdNonAt) <|> string "@@"
+gdAnyChar :: Parser T.Text
+gdAnyChar = (fmap T.singleton gdNonAt) <|> "@@"
 
 -- | Parse non_at.
 gdNonAt :: Parser Char
@@ -44,12 +45,12 @@ gdDelim = optional$ char '\x20'
 
 -- | Parse escape.
 gdEscape :: Parser GDEscape
-gdEscape = GDEscape . T.pack <$>
-  (string "@#" *> gdEscapeText <* char '@' <* (optional$ char ' '))
+gdEscape = GDEscape <$>
+  ("@#" *> gdEscapeText <* char '@' <* (optional$ char ' '))
 
 -- | Parse escape_text.
-gdEscapeText :: Parser String
-gdEscapeText = concat <$> many gdAnyChar
+gdEscapeText :: Parser T.Text
+gdEscapeText = T.concat <$> many gdAnyChar
 
 -- | Parse level.
 gdLevel :: Parser GDLevel
@@ -58,7 +59,7 @@ gdLevel = GDLevel . read <$> count' 1 2 digitChar <* gdDelim
 -- | Parse line_item.
 gdLineItem :: Parser GDLineItem
 gdLineItem = fmap GDLineItem . some$
-  (,) <$> optional gdEscape <*> (T.pack . concat <$> some gdAnyChar)
+  (,) <$> optional gdEscape <*> (T.concat <$> some gdAnyChar)
 
 -- | Parse pointer.
 gdPointer :: Parser GDXRefID
@@ -85,8 +86,8 @@ gdTag :: Parser GDTag
 gdTag = GDTag . T.toUpper . T.pack <$> many gdAlphaNum
 
 -- | parse terminator.
-gdTerminator :: Parser String
-gdTerminator = string "\n" <|> string "\r" <|> string "\r\n" <|> string "\n\r"
+gdTerminator :: Parser T.Text
+gdTerminator = "\n" <|> "\r" <|> "\r\n" <|> "\n\r"
 
 -- | Parse xref_ID.
 gdXRefID :: Parser (Maybe GDXRefID)
