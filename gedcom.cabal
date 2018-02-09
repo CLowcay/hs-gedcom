@@ -2,14 +2,13 @@ name:                gedcom
 version:             0.2.0.0
 synopsis:            Parser for the GEDCOM genealogy file format.
 description:         A parser for the legacy GEDCOM 5.5 file format. GEDCOM is
-                     widely used by genealogy software, despite the limitations
-                     of the format.
+                     a widely used file format in genealogy.
 homepage:            https://github.com/CLowcay/hs-gedcom
 license:             BSD3
 license-file:        LICENSE
 author:              Callum Lowcay
 maintainer:          cwslowcay@gmail.com
-copyright:           2017 Callum Lowcay
+copyright:           2018 Callum Lowcay
 category:            Genealogy
 build-type:          Simple
 extra-source-files:  README.md changelog.md
