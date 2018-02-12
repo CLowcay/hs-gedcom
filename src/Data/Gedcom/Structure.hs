@@ -416,7 +416,7 @@ data PersonalNamePieces = PersonalNamePieces {
 
 -- | Extra information about an individual.
 data IndividualAttribute = IndividualAttribute
-    IndividualAttributeType (IndividualEventDetail)
+    IndividualAttributeType IndividualEventDetail
   deriving Show
 
 -- | Classification of extra information about an individual.

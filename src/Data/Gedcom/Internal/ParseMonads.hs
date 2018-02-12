@@ -54,7 +54,7 @@ runMultiMonad ::
   -> MultiMonad a     -- ^ The MultiMonad that does the parsing.
   -> StructureMonad a
 runMultiMonad children (MultiMonad m) =
-  ((flip evalStateT) children.runExceptT$ m) >>= rethrowError
+  (flip evalStateT children.runExceptT$ m) >>= rethrowError
   where rethrowError x = case x of
                            Left e -> throwError e
                            Right v -> return v
@@ -62,7 +62,7 @@ runMultiMonad children (MultiMonad m) =
 -- | Parse multiple instances of a structure
 parseMulti :: StructureParser a -> MultiMonad [a]
 parseMulti p = MultiMonad$ do
-  ls <- lift$ get
+  ls <- lift get
   (others, vs) <- lift$ lift$ partitionEithers <$> p `traverse` ls
   lift$ put others
   return vs
@@ -70,7 +70,7 @@ parseMulti p = MultiMonad$ do
 -- | Parse an optional instance of a structure
 parseOptional :: StructureParser a -> MultiMonad (Maybe a)
 parseOptional p = MultiMonad$ do
-  ls <- lift$ get
+  ls <- lift get
   (mr, leftover) <-
     lift$ lift$ foldrM (\v (r, rest) ->
       if isJust r then return (r, v:rest)
@@ -93,7 +93,7 @@ parseRequired tag p = do
   case r of
     Just v -> return v
     Nothing -> throwError.TagError$
-      "Could not find required " <> (T.show tag) <> " tag"
+      "Could not find required " <> T.show tag <> " tag"
 
 -- | A monad for parsing an instance of a GEDCOM structure from a GEDCOM
 -- subtree.
@@ -109,12 +109,12 @@ addReference :: Typeable a
 addReference thisID value = StructureMonad$ do
   alreadySeen <- M.member thisID <$> lift get
   when alreadySeen$
-    throwError.DuplicateRef$ "Duplicate definition of " <> (T.show thisID)
+    throwError.DuplicateRef$ "Duplicate definition of " <> T.show thisID
   lift.modify$ M.insert thisID (toDyn value)
   return ()
 
 -- | Run a 'StructureMonad', returning either an error or a value, and the
 -- cross reference table.
 runStructure :: StructureMonad a -> (Either GDError a, M.Map GDXRefID Dynamic)
-runStructure (StructureMonad m) = (flip runState) M.empty . runExceptT$ m
+runStructure (StructureMonad m) = flip runState M.empty . runExceptT$ m
 

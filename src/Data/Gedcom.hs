@@ -50,7 +50,7 @@ gdLookup (GDStructure x) _ = Right x
 gdLookup (GDXRef thisID) (XRefTable table) =
   case M.lookup thisID table of
     Nothing -> Left$ RefNotPresent thisID
-    Just (dynamic) -> case fromDynamic dynamic of
+    Just dynamic -> case fromDynamic dynamic of
       Nothing -> Left$
         WrongRefType (dynTypeRep dynamic) (typeRep (Proxy :: Proxy a))
       Just v -> Right v
@@ -79,7 +79,7 @@ parseGedcomString mfilename intext =
 
   in case partitionEithers trees of
     ([], []) -> Left . LineFormatError$
-      "Invalid format (is " <> (T.show filename) <> " really a gedcom file?)"
+      "Invalid format (is " <> T.show filename <> " really a gedcom file?)"
     (err:_, []) -> Left . LineFormatError . T.show$ err
     (_, dtrees) -> case partitionEithers.fmap doParseGedcom$ dtrees of
       ([], []) -> Left . LineFormatError$ "Unknown character encoding"

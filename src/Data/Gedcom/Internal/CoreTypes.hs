@@ -43,9 +43,9 @@ data GDRefError =
   | WrongRefType TypeRep TypeRep   -- ^ Dereferenced structure had the wrong type
 
 instance Show GDRefError where
-  show (RefNotPresent thisID) = "Missing referenced structure " ++ (show thisID)
+  show (RefNotPresent thisID) = "Missing referenced structure " ++ show thisID
   show (WrongRefType got expected) = "Referenced value has wrong type, expected "
-    ++ (show expected) ++ " but saw " ++ (show got)
+    ++ show expected ++ " but saw " ++ show got
 
 -- | A parse error.
 data GDError =
@@ -124,7 +124,7 @@ gdIgnoreEscapes  = T.concat . fmap snd
 gdFilterEscapes ::
   [GDEscape] -> [(Maybe GDEscape, T.Text)] -> [(Maybe GDEscape, T.Text)]
 gdFilterEscapes escapes =
-  gdLineData . mconcat . fmap GDLineItem . fmap (:[]) . fmap (first f)
+  gdLineData . mconcat . fmap (GDLineItem . (:[]) . first f)
   where
     f (Just e) = if e `elem` escapes then Just e else Nothing
     f Nothing = Nothing

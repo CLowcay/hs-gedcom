@@ -1,5 +1,5 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TupleSections #-}
+{-# LANGUAGE LambdaCase #-}
 
 {-|
 Module: Data.Gedcom.LineParser
@@ -29,7 +29,7 @@ import Text.Megaparsec.Char
 
 -- | Parse any_char.
 gdAnyChar :: Parser T.Text
-gdAnyChar = (fmap T.singleton gdNonAt) <|> "@@"
+gdAnyChar = fmap T.singleton gdNonAt <|> "@@"
 
 -- | Parse non_at.
 gdNonAt :: Parser Char
@@ -46,7 +46,7 @@ gdDelim = optional$ char '\x20'
 -- | Parse escape.
 gdEscape :: Parser GDEscape
 gdEscape = GDEscape <$>
-  ("@#" *> gdEscapeText <* char '@' <* (optional$ char ' '))
+  ("@#" *> gdEscapeText <* char '@' <* optional (char ' '))
 
 -- | Parse escape_text.
 gdEscapeText :: Parser T.Text
@@ -65,11 +65,11 @@ gdLineItem = fmap GDLineItem . some$
 gdPointer :: Parser GDXRefID
 gdPointer = char '@' *> plabel <* char '@'
   where plabel = fmap (GDXRefID . T.pack)$
-                  (:) <$> gdAlphaNum <*> (many gdNonAt)
+                  (:) <$> gdAlphaNum <*> many gdNonAt
 
 -- | Parse line_value
 gdLineValue :: Parser GDLineValue
-gdLineValue = eitherP gdPointer gdLineItem <&> \x -> case x of
+gdLineValue = eitherP gdPointer gdLineItem <&> \case
   Left v -> GDXRefIDV v
   Right v -> GDLineItemV v
 
@@ -99,7 +99,7 @@ gdLine = GDLine <$>
   gdLevel <*>
   gdOptionalXRefID <*>
   gdTag <*>
-  (optional gdOptionalLineValue) <* gdTerminator
+  optional gdOptionalLineValue <* gdTerminator
 
 -- | Convert local ids to global ids.
 gdExpandID ::
@@ -128,9 +128,9 @@ gdLineLevel ::
   -> Parser GDLine
 gdLineLevel pid n = do
   (GDLine n' xrid tag v) <- gdLine
-  when (n' /= n)$ fail$ "Saw a " ++ (show tag) ++
-    " tag at level " ++ (show n') ++
-    " but expected level was " ++ (show n)
+  when (n' /= n)$ fail$ "Saw a " ++ show tag ++
+    " tag at level " ++ show n' ++
+    " but expected level was " ++ show n
   return$ GDLine n' (fmap (gdExpandID pid) xrid) tag (fmap (gdExpandPointer pid) v)
 
 -- | Parse a GEDCOM subtree
@@ -144,5 +144,5 @@ gdTree pid n = try$ do
 
 -- | Parse the raw GEDCOM syntax tree.
 gdRoot :: Parser GDRoot
-gdRoot = GDRoot <$> (many$ gdTree (GDXRefID "") 0)
+gdRoot = GDRoot <$> many (gdTree (GDXRefID "") 0)
 
