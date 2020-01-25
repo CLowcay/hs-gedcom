@@ -1016,7 +1016,7 @@ parseBoolTag tag = parseNoLinkTag tag$ \(v, _) ->
     Just yn -> return yn
   where
     ynParser :: Parser Bool
-    ynParser = (True <$ "yes") <|> (False <$ "no")
+    ynParser = (True <$ string' "yes") <|> (False <$ string' "no")
 
 -- | Parse a Word value.
 parseWordTag :: GDTag -> StructureParser Word
