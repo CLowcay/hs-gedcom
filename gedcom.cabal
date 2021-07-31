@@ -40,15 +40,15 @@ library
       src
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wincomplete-record-updates -Wredundant-constraints -Wpartial-fields
   build-depends:
-      array
+      array >=0.5.4 && <0.6
     , base >=4.7 && <5
-    , bytestring
-    , containers
-    , megaparsec
-    , monad-loops
-    , mtl
-    , text
-    , time
+    , bytestring >=0.10.12 && <0.11
+    , containers >=0.6.2.1 && <0.7
+    , megaparsec >=9.0.1 && <10.0
+    , monad-loops >=0.4.3 && <0.5
+    , mtl >=2.2.2 && <2.3
+    , text >=1.2.4.1 && <1.3
+    , time >=1.9.3 && <1.10
   default-language: Haskell2010
 
 test-suite gedcom-test
@@ -60,15 +60,15 @@ test-suite gedcom-test
       test
   ghc-options: -Wall -Wcompat -Wincomplete-uni-patterns -Wincomplete-record-updates -Wredundant-constraints -Wpartial-fields -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      array
+      array >=0.5.4 && <0.6
     , base >=4.7 && <5
-    , bytestring
-    , containers
+    , bytestring >=0.10.12 && <0.11
+    , containers >=0.6.2.1 && <0.7
     , gedcom
     , hspec
-    , megaparsec
-    , monad-loops
-    , mtl
-    , text
-    , time
+    , megaparsec >=9.0.1 && <10.0
+    , monad-loops >=0.4.3 && <0.5
+    , mtl >=2.2.2 && <2.3
+    , text >=1.2.4.1 && <1.3
+    , time >=1.9.3 && <1.10
   default-language: Haskell2010

@@ -11,7 +11,8 @@
 --
 -- These parsers extract the GEDCOM records from the raw syntax tree.
 module Data.Gedcom.Internal.Parser
-  ( parseGedcom,
+  ( NoLinkHandler,
+    parseGedcom,
     parseHeader,
     parseBoolTag,
     parseWordTag,
@@ -41,7 +42,7 @@ import Data.Time.Clock (UTCTime (UTCTime), secondsToDiffTime)
 import Text.Megaparsec (MonadParsec (try), anySingle, count', many, parseMaybe)
 import Text.Megaparsec.Char (digitChar, string')
 
--- | Parse a 'Gedcom' value from the raw GEDCOM syntax tree.
+-- | Parse a 'G.Gedcom' value from the raw GEDCOM syntax tree.
 parseGedcom :: G.GDRoot -> (Either G.GDError G.Gedcom, Map G.GDXRefID Dynamic)
 parseGedcom (G.GDRoot children) =
   runStructure . runMultiMonad children $
@@ -845,7 +846,7 @@ parseDate t = case prepareDateText t of
      in getDate calendar (cal <> G.gdIgnoreEscapes rest)
   _ -> Nothing
 
--- | Parse a 'G.Date' from a given string assuming the given 'Calendar'.
+-- | Parse a 'G.Date' from a given string assuming the given 'G.Calendar'.
 getDate :: G.Calendar -> Text -> Maybe G.Date
 getDate calendar = parseMaybe parser
   where
