@@ -1,153 +1,173 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Data.Gedcom.Internal.CoreTypes
-import Data.Gedcom.Internal.LineParser
-import Data.Gedcom.Internal.ParseMonads
-import Data.Gedcom.Internal.Parser
-import Data.Monoid
-import Data.Void
-import qualified Data.Text.All as T
-import Test.Hspec
-import Text.Megaparsec
+import Data.Gedcom.Internal.Common (showt)
+import qualified Data.Gedcom.Internal.CoreTypes as G
+import Data.Gedcom.Internal.LineParser (gdRoot)
+import Data.Gedcom.Internal.ParseMonads (StructureParser, runStructure)
+import Data.Gedcom.Internal.Parser (parseBoolTag, parseLinkTag, parseListTag, parseNoLinkTag, parseTag, parseTextTag, parseWordTag)
+import Data.Text (Text)
+import Data.Void (Void)
+import Test.Hspec (describe, hspec, it, shouldBe)
+import Text.Megaparsec (parseMaybe)
 
-testTagData :: T.Text
+testTagData :: Text
 testTagData = "some test data"
 
-testTag :: T.Text -> Maybe GDLine
+testTag :: Text -> Maybe G.GDLine
 testTag d = do
-  (GDRoot [GDTree t []]) <- parseMaybe gdRoot$ "0 TEST " <> d <> "\n"
+  (G.GDRoot [G.GDTree t []]) <- parseMaybe gdRoot $ "0 TEST " <> d <> "\n"
   return t
 
-emptyTag :: Maybe GDLine
+emptyTag :: Maybe G.GDLine
 emptyTag = do
-  (GDRoot [GDTree t []]) <- parseMaybe gdRoot "0 TEST\n"
+  (G.GDRoot [G.GDTree t []]) <- parseMaybe gdRoot "0 TEST\n"
   return t
 
-ref1 :: GDXRefID
-ref1 = GDXRefID "1"
+ref1 :: G.GDXRefID
+ref1 = G.GDXRefID "1"
 
-linkTag :: Maybe GDLine
+linkTag :: Maybe G.GDLine
 linkTag = do
-  (GDRoot [GDTree t []]) <- parseMaybe gdRoot "0 TEST @1@\n"
+  (G.GDRoot [G.GDTree t []]) <- parseMaybe gdRoot "0 TEST @1@\n"
   return t
 
-linkLinkTag :: Maybe GDLine
+linkLinkTag :: Maybe G.GDLine
 linkLinkTag = do
-  (GDRoot [GDTree t []]) <- parseMaybe gdRoot "0 @2@ TEST @1@\n"
+  (G.GDRoot [G.GDTree t []]) <- parseMaybe gdRoot "0 @2@ TEST @1@\n"
   return t
 
-crdTag :: Maybe GDLine
+crdTag :: Maybe G.GDLine
 crdTag = do
-  (GDRoot [GDTree t []]) <-
-    parseMaybe gdRoot$ "0 @1@ TEST " <> testTagData <> "\n"
+  (G.GDRoot [G.GDTree t []]) <-
+    parseMaybe gdRoot $ "0 @1@ TEST " <> testTagData <> "\n"
   return t
 
-data ParseReturn a =
-  Error T.Text | NoMatch | Match a deriving (Show, Eq)
+data ParseReturn a
+  = Error Text
+  | NoMatch
+  | Match a
+  deriving (Show, Eq)
 
 isError :: ParseReturn a -> Bool
 isError (Error _) = True
 isError _ = False
 
-parseStructure :: Maybe GDTree -> StructureParser a -> ParseReturn a
-parseStructure Nothing p = Error "Line parse error"
+parseStructure :: Maybe G.GDTree -> StructureParser a -> ParseReturn a
+parseStructure Nothing _ = Error "Line parse error"
 parseStructure (Just v) p = case runStructure (p v) of
-    (Right (Left _), _) -> NoMatch
-    (Right (Right m), _) -> Match m
-    (Left err, _) -> Error$ T.show err
+  (Right (Left _), _) -> NoMatch
+  (Right (Right m), _) -> Match m
+  (Left err, _) -> Error $ showt err
 
-noEscapes :: T.Text -> [(Maybe GDEscape, T.Text)]
+noEscapes :: Text -> [(Maybe G.GDEscape, Text)]
 noEscapes v = [(Nothing, v)]
 
 main :: IO ()
-main = hspec$ do
-  describe "gdRoot"$ do
-    it "parses a simple line with no children"$
-      testTag testTagData `shouldBe`
-        (Just$ GDLine (GDLevel 0) Nothing (GDTag "TEST")
-          (Just . GDLineItemV . GDLineItem . noEscapes$ testTagData))
-    it "parses a simple cross referenced line"$
-      crdTag `shouldBe` (Just$ GDLine (GDLevel 0) (Just ref1) (GDTag "TEST")
-        (Just . GDLineItemV . GDLineItem . noEscapes$ testTagData))
-    it "parses a simple line cross referencing line"$
-      linkTag `shouldBe` (Just$ GDLine (GDLevel 0) Nothing (GDTag "TEST")
-        (Just . GDXRefIDV$  ref1))
-    it "parses an empty tag with no children"$
-      emptyTag `shouldBe`
-        (Just$ GDLine (GDLevel 0) Nothing (GDTag "TEST") Nothing)
+main = hspec $ do
+  describe "gdRoot" $ do
+    it "parses a simple line with no children" $
+      testTag testTagData
+        `shouldBe` Just
+          ( G.GDLine
+              (G.GDLevel 0)
+              Nothing
+              (G.GDTag "TEST")
+              (Just . G.GDLineItemV . G.GDLineItem . noEscapes $ testTagData)
+          )
+    it "parses a simple cross referenced line" $
+      crdTag
+        `shouldBe` Just
+          ( G.GDLine
+              (G.GDLevel 0)
+              (Just ref1)
+              (G.GDTag "TEST")
+              (Just . G.GDLineItemV . G.GDLineItem . noEscapes $ testTagData)
+          )
+    it "parses a simple line cross referencing line" $
+      linkTag
+        `shouldBe` Just
+          ( G.GDLine
+              (G.GDLevel 0)
+              Nothing
+              (G.GDTag "TEST")
+              (Just . G.GDXRefIDV $ ref1)
+          )
+    it "parses an empty tag with no children" $
+      emptyTag
+        `shouldBe` Just (G.GDLine (G.GDLevel 0) Nothing (G.GDTag "TEST") Nothing)
 
-  describe "parseNoLinkTag"$ do
-    it "matches the specified tag"$
-      testLine (testTag testTagData) (parseNoLinkTag (GDTag "TEST") pure)
-        `shouldBe` Match (noEscapes testTagData, [])
-    it "matches the specified tag (with a cross reference)" $
-      testLine crdTag (parseNoLinkTag (GDTag "TEST") pure)
-        `shouldBe` Match (noEscapes testTagData, [])
-    it "doesn't match other tags"$
-      testLine (testTag testTagData) (parseNoLinkTag (GDTag "OTHER") pure)
-        `shouldBe` NoMatch
-    it "doesn't parse links"$
-      isError$ testLine linkTag (parseNoLinkTag (GDTag "TEST") pure)
-
-  describe "parseTag"$ do
-    it "matches the specified tag"$
-      testLine (testTag testTagData) (parseTag (GDTag "TEST") pure)
-        `shouldBe` (Match . GDStructure$ (noEscapes testTagData, []))
-    it "matches the specified tag (with a cross reference)" $
-      testLine crdTag (parseTag (GDTag "TEST") pure)
-        `shouldBe` (Match . GDStructure$ (noEscapes testTagData, []))
-    it "doesn't match other tags"$
-      testLine (testTag testTagData) (parseTag (GDTag "OTHER") pure)
-        `shouldBe` NoMatch
-    it "parses links"$
-      testLine linkTag (parseTag (GDTag "TEST") pure)
-        `shouldBe` (Match$ GDXRef ref1)
-    it "doesn't parse links to links"$
-      isError$ testLine linkLinkTag (parseTag (GDTag "TEST") pure)
-
-  describe "parseLinkTag"$ do
-    it "parses link tags"$
-      testLine linkTag (parseLinkTag (GDTag "TEST")) `shouldBe`
-        Match (GDXRef ref1 :: GDRef Void)
-    it "doesn't parse other tags"$
-      isError$ testLine (testTag testTagData)
-        (parseLinkTag (GDTag "TEST") :: StructureParser (GDRef Void))
-
-  describe "parseTextTag"$
+  describe "parseNoLinkTag" $ do
     it "matches the specified tag" $
-      testLine (testTag testTagData) (parseTextTag (GDTag "TEST"))
+      testLine (testTag testTagData) (parseNoLinkTag (G.GDTag "TEST") pure)
+        `shouldBe` Match (noEscapes testTagData, [])
+    it "matches the specified tag (with a cross reference)" $
+      testLine crdTag (parseNoLinkTag (G.GDTag "TEST") pure)
+        `shouldBe` Match (noEscapes testTagData, [])
+    it "doesn't match other tags" $
+      testLine (testTag testTagData) (parseNoLinkTag (G.GDTag "OTHER") pure)
+        `shouldBe` NoMatch
+    it "doesn't parse links" $
+      isError $ testLine linkTag (parseNoLinkTag (G.GDTag "TEST") pure)
+
+  describe "parseTag" $ do
+    it "matches the specified tag" $
+      testLine (testTag testTagData) (parseTag (G.GDTag "TEST") pure)
+        `shouldBe` (Match . G.GDStructure $ (noEscapes testTagData, []))
+    it "matches the specified tag (with a cross reference)" $
+      testLine crdTag (parseTag (G.GDTag "TEST") pure)
+        `shouldBe` (Match . G.GDStructure $ (noEscapes testTagData, []))
+    it "doesn't match other tags" $
+      testLine (testTag testTagData) (parseTag (G.GDTag "OTHER") pure)
+        `shouldBe` NoMatch
+    it "parses links" $
+      testLine linkTag (parseTag (G.GDTag "TEST") pure)
+        `shouldBe` Match (G.GDXRef ref1)
+    it "doesn't parse links to links" $
+      isError $ testLine linkLinkTag (parseTag (G.GDTag "TEST") pure)
+
+  describe "parseLinkTag" $ do
+    it "parses link tags" $
+      testLine linkTag (parseLinkTag (G.GDTag "TEST"))
+        `shouldBe` Match (G.GDXRef ref1 :: G.GDRef Void)
+    it "doesn't parse other tags" $
+      isError $
+        testLine
+          (testTag testTagData)
+          (parseLinkTag (G.GDTag "TEST") :: StructureParser (G.GDRef Void))
+
+  describe "parseTextTag" $
+    it "matches the specified tag" $
+      testLine (testTag testTagData) (parseTextTag (G.GDTag "TEST"))
         `shouldBe` Match testTagData
 
-  describe "parseListTag"$ do
-    it "splits lists"$
-      testLine (testTag "one,,two,three,four") (parseListTag (GDTag "TEST"))
+  describe "parseListTag" $ do
+    it "splits lists" $
+      testLine (testTag "one,,two,three,four") (parseListTag (G.GDTag "TEST"))
         `shouldBe` Match ["one", "", "two", "three", "four"]
-    it "handles the empty list"$
-      testLine emptyTag (parseListTag (GDTag "TEST")) `shouldBe` Match []
+    it "handles the empty list" $
+      testLine emptyTag (parseListTag (G.GDTag "TEST")) `shouldBe` Match []
 
-  describe "parseWordTag"$ do
-    it "parses numbers"$
-      testLine (testTag "42") (parseWordTag (GDTag "TEST")) `shouldBe` Match 42
-    it "doesn't parse negative numbers"$
-      isError$ testLine (testTag "-42") (parseWordTag (GDTag "TEST"))
-    it "doesn't parse empty strings"$
-      isError$ testLine (testTag "") (parseWordTag (GDTag "TEST"))
+  describe "parseWordTag" $ do
+    it "parses numbers" $
+      testLine (testTag "42") (parseWordTag (G.GDTag "TEST")) `shouldBe` Match 42
+    it "doesn't parse negative numbers" $
+      isError $ testLine (testTag "-42") (parseWordTag (G.GDTag "TEST"))
+    it "doesn't parse empty strings" $
+      isError $ testLine (testTag "") (parseWordTag (G.GDTag "TEST"))
 
-  describe "parseBoolTag"$ do
-    it "parses yes and no"$ do
-      testLine (testTag "yes") (parseBoolTag (GDTag "TEST"))
+  describe "parseBoolTag" $ do
+    it "parses yes and no" $ do
+      testLine (testTag "yes") (parseBoolTag (G.GDTag "TEST"))
         `shouldBe` Match True
-      testLine (testTag "no") (parseBoolTag (GDTag "TEST"))
+      testLine (testTag "no") (parseBoolTag (G.GDTag "TEST"))
         `shouldBe` Match False
-    it "parses case insensitive"$ do
-      testLine (testTag "Yes") (parseBoolTag (GDTag "TEST"))
+    it "parses case insensitive" $ do
+      testLine (testTag "Yes") (parseBoolTag (G.GDTag "TEST"))
         `shouldBe` Match True
-      testLine (testTag "nO") (parseBoolTag (GDTag "TEST"))
+      testLine (testTag "nO") (parseBoolTag (G.GDTag "TEST"))
         `shouldBe` Match False
-    it "doesn't parse anything else"$
-      isError (testLine (testTag "true") (parseBoolTag (GDTag "TEST")))
-      && isError (testLine (testTag "false") (parseBoolTag (GDTag "TEST")))
-
+    it "doesn't parse anything else" $
+      isError (testLine (testTag "true") (parseBoolTag (G.GDTag "TEST")))
+        && isError (testLine (testTag "false") (parseBoolTag (G.GDTag "TEST")))
   where
-    testLine l = parseStructure (GDTree <$> l <*> pure [])
-
+    testLine l = parseStructure (G.GDTree <$> l <*> pure [])

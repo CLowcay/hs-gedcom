@@ -1,39 +1,49 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 
-{-|
-Module: Data.Gedcom.LineParser
-Description: Low-level GEDCOM parser
-Copyright: (c) Callum Lowcay, 2017
-License: BSD3
-Maintainer: cwslowcay@gmail.com
-Stability: experimental
-Portability: GHC
+-- |
+-- Module: Data.Gedcom.LineParser
+-- Description: Low-level GEDCOM parser
+-- Copyright: (c) Callum Lowcay, 2017 - 2021
+-- License: BSD3
+-- Maintainer: cwslowcay@gmail.com
+-- Stability: experimental
+-- Portability: GHC
+--
+-- This module parses a Text string into a GEDCOM syntax tree.
+module Data.Gedcom.Internal.LineParser
+  ( gdRoot,
+    gdDelim,
+  )
+where
 
-This module parses a Text string into a GEDCOM syntax tree.
-
--}
-module Data.Gedcom.Internal.LineParser (
-  gdRoot, gdDelim
-) where
-
-import Control.Monad
-import Data.Char
-import Data.Gedcom.Internal.Common
-import Data.Gedcom.Internal.CoreTypes
-import Data.Maybe
-import Data.Monoid
-import qualified Data.Text.All as T
+import Control.Monad (when)
+import Data.Char (isControl)
+import Data.Functor ((<&>))
+import Data.Gedcom.Internal.Common (Parser)
+import qualified Data.Gedcom.Internal.CoreTypes as G
+import Data.Maybe (fromMaybe)
+import Data.Text (Text)
+import qualified Data.Text as T
 import Text.Megaparsec
-import Text.Megaparsec.Char
+  ( MonadParsec (try),
+    count',
+    eitherP,
+    many,
+    optional,
+    satisfy,
+    some,
+    (<|>),
+  )
+import Text.Megaparsec.Char (alphaNumChar, char, digitChar)
 
 -- | Parse any_char.
-gdAnyChar :: Parser T.Text
+gdAnyChar :: Parser Text
 gdAnyChar = fmap T.singleton gdNonAt <|> "@@"
 
 -- | Parse non_at.
 gdNonAt :: Parser Char
-gdNonAt = satisfy (\c -> (not.isControl) c && c /= '@' && c /= '\x7F')
+gdNonAt = satisfy (\c -> (not . isControl) c && c /= '@' && c /= '\x7F')
 
 -- | Parse alphanum.
 gdAlphaNum :: Parser Char
@@ -41,108 +51,127 @@ gdAlphaNum = alphaNumChar <|> char '_'
 
 -- | Parse delim.
 gdDelim :: Parser (Maybe Char)
-gdDelim = optional$ char '\x20'
+gdDelim = optional $ char '\x20'
 
 -- | Parse escape.
-gdEscape :: Parser GDEscape
-gdEscape = GDEscape <$>
-  ("@#" *> gdEscapeText <* char '@' <* optional (char ' '))
+gdEscape :: Parser G.GDEscape
+gdEscape =
+  G.GDEscape
+    <$> ("@#" *> gdEscapeText <* char '@' <* optional (char ' '))
 
 -- | Parse escape_text.
-gdEscapeText :: Parser T.Text
+gdEscapeText :: Parser Text
 gdEscapeText = T.concat <$> many gdAnyChar
 
 -- | Parse level.
-gdLevel :: Parser GDLevel
-gdLevel = GDLevel . read <$> count' 1 2 digitChar <* gdDelim
+gdLevel :: Parser G.GDLevel
+gdLevel = G.GDLevel . read <$> count' 1 2 digitChar <* gdDelim
 
 -- | Parse line_item.
-gdLineItem :: Parser GDLineItem
-gdLineItem = fmap GDLineItem . some$
-  (,) <$> optional gdEscape <*> (T.concat <$> some gdAnyChar)
+gdLineItem :: Parser G.GDLineItem
+gdLineItem =
+  fmap G.GDLineItem . some $
+    (,) <$> optional gdEscape <*> (T.concat <$> some gdAnyChar)
 
 -- | Parse pointer.
-gdPointer :: Parser GDXRefID
+gdPointer :: Parser G.GDXRefID
 gdPointer = char '@' *> plabel <* char '@'
-  where plabel = fmap (GDXRefID . T.pack)$
-                  (:) <$> gdAlphaNum <*> many gdNonAt
+  where
+    plabel =
+      fmap (G.GDXRefID . T.pack) $
+        (:) <$> gdAlphaNum <*> many gdNonAt
 
 -- | Parse line_value
-gdLineValue :: Parser GDLineValue
-gdLineValue = eitherP gdPointer gdLineItem <&> \case
-  Left v -> GDXRefIDV v
-  Right v -> GDLineItemV v
+gdLineValue :: Parser G.GDLineValue
+gdLineValue =
+  eitherP gdPointer gdLineItem <&> \case
+    Left v -> G.GDXRefIDV v
+    Right v -> G.GDLineItemV v
 
 -- | Parse optional_line_value.
-gdOptionalLineValue :: Parser GDLineValue
+gdOptionalLineValue :: Parser G.GDLineValue
 gdOptionalLineValue = gdDelim *> gdLineValue
 
 -- | Parse optional_xref_ID.
-gdOptionalXRefID :: Parser (Maybe GDXRefID)
+gdOptionalXRefID :: Parser (Maybe G.GDXRefID)
 gdOptionalXRefID = gdXRefID <* gdDelim
 
 -- | Parse tag.
-gdTag :: Parser GDTag
-gdTag = GDTag . T.toUpper . T.pack <$> many gdAlphaNum
+gdTag :: Parser G.GDTag
+gdTag = G.GDTag . T.toUpper . T.pack <$> many gdAlphaNum
 
 -- | parse terminator.
-gdTerminator :: Parser T.Text
+gdTerminator :: Parser Text
 gdTerminator = "\n" <|> "\r" <|> "\r\n" <|> "\n\r"
 
 -- | Parse xref_ID.
-gdXRefID :: Parser (Maybe GDXRefID)
-gdXRefID = optional $ fmap (\(GDXRefID t) -> GDXRefID t) gdPointer
+gdXRefID :: Parser (Maybe G.GDXRefID)
+gdXRefID = optional $ fmap (\(G.GDXRefID t) -> G.GDXRefID t) gdPointer
 
 -- | Parse gedcom_line.
-gdLine :: Parser GDLine
-gdLine = GDLine <$>
-  gdLevel <*>
-  gdOptionalXRefID <*>
-  gdTag <*>
-  optional gdOptionalLineValue <* gdTerminator
+gdLine :: Parser G.GDLine
+gdLine =
+  G.GDLine
+    <$> gdLevel
+    <*> gdOptionalXRefID
+    <*> gdTag
+    <*> optional gdOptionalLineValue <* gdTerminator
 
 -- | Convert local ids to global ids.
 gdExpandID ::
-     GDXRefID -- ^ The parent structure's ID
-  -> GDXRefID -- ^ The local ID.
-  -> GDXRefID -- ^ A global ID.
-gdExpandID (GDXRefID pid) s@(GDXRefID sub) =
+  -- | The parent structure's ID
+  G.GDXRefID ->
+  -- | The local ID.
+  G.GDXRefID ->
+  -- | A global ID.
+  G.GDXRefID
+gdExpandID (G.GDXRefID pid) s@(G.GDXRefID sub) =
   case T.uncons sub of
     Nothing -> s
-    Just ('!', _) -> GDXRefID$ pid <> sub
+    Just ('!', _) -> G.GDXRefID $ pid <> sub
     _ -> s
 
 -- | Convert local ids to global ids.
 gdExpandPointer ::
-     GDXRefID     -- ^ The parent structure's ID.
-  -> GDLineValue  -- ^ The line to update.
-  -> GDLineValue  -- ^ An updated line where local ID's have been made global.
+  -- | The parent structure's ID.
+  G.GDXRefID ->
+  -- | The line to update.
+  G.GDLineValue ->
+  -- | An updated line where local ID's have been made global.
+  G.GDLineValue
 gdExpandPointer pid v = case v of
-  GDLineItemV _ -> v
-  GDXRefIDV p -> GDXRefIDV$ gdExpandID pid p
+  G.GDLineItemV _ -> v
+  G.GDXRefIDV p -> G.GDXRefIDV $ gdExpandID pid p
 
 -- | Parse a line at a fixed level
 gdLineLevel ::
-     GDXRefID -- ^ The parent ID 
-  -> GDLevel  -- ^ The level to parse the line at
-  -> Parser GDLine
+  -- | The parent ID
+  G.GDXRefID ->
+  -- | The level to parse the line at
+  G.GDLevel ->
+  Parser G.GDLine
 gdLineLevel pid n = do
-  (GDLine n' xrid tag v) <- gdLine
-  when (n' /= n)$ fail$ "Saw a " ++ show tag ++
-    " tag at level " ++ show n' ++
-    " but expected level was " ++ show n
-  return$ GDLine n' (fmap (gdExpandID pid) xrid) tag (fmap (gdExpandPointer pid) v)
+  (G.GDLine n' xrid tag v) <- gdLine
+  when (n' /= n) $
+    fail $
+      "Saw a " ++ show tag
+        ++ " tag at level "
+        ++ show n'
+        ++ " but expected level was "
+        ++ show n
+  pure $ G.GDLine n' (fmap (gdExpandID pid) xrid) tag (fmap (gdExpandPointer pid) v)
 
 -- | Parse a GEDCOM subtree
 gdTree ::
-     GDXRefID -- ^ The parent ID
-  -> GDLevel  -- ^ The level where the subtree is rooted
-  -> Parser GDTree
-gdTree pid n = try$ do
-  line@(GDLine _ pid' _ _) <- gdLineLevel pid n
-  GDTree line <$> many (gdTree (fromMaybe pid pid') (n + 1))
+  -- | The parent ID
+  G.GDXRefID ->
+  -- | The level where the subtree is rooted
+  G.GDLevel ->
+  Parser G.GDTree
+gdTree pid n = try $ do
+  line@(G.GDLine _ pid' _ _) <- gdLineLevel pid n
+  G.GDTree line <$> many (gdTree (fromMaybe pid pid') (n + 1))
 
 -- | Parse the raw GEDCOM syntax tree.
-gdRoot :: Parser GDRoot
-gdRoot = GDRoot <$> many (gdTree (GDXRefID "") 0)
-
+gdRoot :: Parser G.GDRoot
+gdRoot = G.GDRoot <$> many (gdTree (G.GDXRefID "") 0)

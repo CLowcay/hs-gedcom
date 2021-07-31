@@ -1,0 +1,51 @@
+name: gedcom
+version: 0.3.0.0
+github: "CLowcay/hs-gedcom"
+license: BSD3
+author: "Callum Lowcay"
+maintainer: "cwslowcay@gmail.com"
+copyright: "2018-2021 Callum Lowcay"
+category: "Genealogy"
+
+extra-source-files:
+  - README.md
+  - changelog.md
+
+# To avoid duplicated efforts in documentation and dealing with the
+# complications of embedding Haddock markup inside cabal files, it is
+# common to point users to the README.md file.
+description: Please see the README on GitHub at <https://github.com/CLowcay/hs-gedcom#README.md>
+
+dependencies:
+  - array
+  - base >= 4.7 && < 5
+  - bytestring
+  - containers
+  - megaparsec
+  - monad-loops
+  - mtl
+  - text
+  - time
+
+ghc-options:
+  - -Wall
+  - -Wcompat
+  - -Wincomplete-uni-patterns
+  - -Wincomplete-record-updates
+  - -Wredundant-constraints
+  - -Wpartial-fields
+
+library:
+  source-dirs: src
+
+tests:
+  gedcom-test:
+    main: Spec.hs
+    source-dirs: test
+    dependencies:
+      - gedcom
+      - hspec
+    ghc-options:
+      - -threaded
+      - -rtsopts
+      - -with-rtsopts=-N
